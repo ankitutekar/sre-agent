@@ -1,0 +1,30 @@
+# Secrets and local config: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code: personal overrides stay local
+.claude/settings.local.json
