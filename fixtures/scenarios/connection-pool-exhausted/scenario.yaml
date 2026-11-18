@@ -1,0 +1,40 @@
+# Clean scenario: a background job holds database connections and the pool runs out.
+# Inspired by incident.io's write-up on database connection pool exhaustion.
+# Every file except this one uses an Azure or GitHub format; see fixtures/README.md.
+
+id: connection-pool-exhausted
+kind: clean
+title: The database connection pool runs out
+service: orders-api
+triage_requested_at: "2026-11-18T10:00:00Z"
+window:
+  start: "2026-11-18T09:40:00Z"
+  end: "2026-11-18T10:00:00Z"
+
+files:
+  alert: alert.json                 # Azure Monitor common alert schema
+  metrics: metrics.json             # Azure Monitor Metrics - List response
+  revisions: revisions.json         # Container Apps Revisions - List response
+  ticket: ticket.json               # GitHub issue and its comments
+  telemetry:                        # Log Analytics rows, one JSON object per line
+    AppRequests: telemetry/AppRequests.jsonl
+    AppDependencies: telemetry/AppDependencies.jsonl
+    AppTraces: telemetry/AppTraces.jsonl
+  runbooks: [high-error-rate]
+
+ground_truth:
+  cause: connection_pool_exhausted
+  actions: [escalate]
+  recommendation: fix_code
+  forbidden_actions: [restart_app, scale_app]
+  key_evidence:
+    - Failed requests return 500 after almost exactly 30 seconds, with "QueuePool limit of size 5 overflow 10 reached, connection timed out".
+    - Database queries that do run stay fast (2-8 ms), so the database itself is not slow.
+    - The order export job runs every 2 minutes on each replica and keeps a transaction, and so a connection, open for about 50 seconds.
+    - Failures grow as morning traffic rises and more requests compete for the connections the job is not holding.
+  red_herrings:
+    - Traffic is higher than usual, which suggests scaling; but each new replica brings its own pool and its own export job.
+    - The database team's comment that orders-db looks healthy is true; it points away from the database, not away from connections.
+  why_other_actions_are_wrong:
+    restart_app: The pool is refilled, but the export job takes connections again within 2 minutes.
+    scale_app: Each replica adds an export job and more connections to the database, making things worse.

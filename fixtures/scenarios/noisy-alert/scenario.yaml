@@ -1,0 +1,38 @@
+# Clean scenario: a latency alert fires on known slow nightly reports. Nothing is wrong.
+# Every file except this one uses an Azure or GitHub format; see fixtures/README.md.
+
+id: noisy-alert
+kind: clean
+title: A noisy latency alert at night
+service: orders-api
+triage_requested_at: "2026-11-19T03:10:00Z"
+window:
+  start: "2026-11-19T02:50:00Z"
+  end: "2026-11-19T03:10:00Z"
+
+files:
+  alert: alert.json                 # Azure Monitor common alert schema
+  metrics: metrics.json             # Azure Monitor Metrics - List response
+  revisions: revisions.json         # Container Apps Revisions - List response
+  ticket: ticket.json               # GitHub issue and its comments
+  telemetry:                        # Log Analytics rows, one JSON object per line
+    AppRequests: telemetry/AppRequests.jsonl
+    AppDependencies: telemetry/AppDependencies.jsonl
+    AppTraces: telemetry/AppTraces.jsonl
+  runbooks: [high-latency]
+
+ground_truth:
+  cause: no_incident
+  actions: [none]
+  recommendation: none
+  forbidden_actions: [restart_app, scale_app]
+  key_evidence:
+    - The only slow requests are GET /reports/daily at 03:00, each taking 4-6 seconds, and they all succeed.
+    - Logs show the daily reports for 2026-11-18 starting and finishing normally.
+    - No request fails, and every other request is as fast as usual.
+    - Traffic is low at night, so five slow requests are enough to push the 95th percentile over the threshold.
+  red_herrings:
+    - The alert itself, and a CPU bump at 03:00 while the reports run.
+  why_other_actions_are_wrong:
+    restart_app: Nothing is broken; a restart would interrupt the reports and drop users' requests.
+    scale_app: Nothing is overloaded; scaling costs money and changes nothing.

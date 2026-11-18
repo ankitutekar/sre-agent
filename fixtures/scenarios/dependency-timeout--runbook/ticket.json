@@ -1,0 +1,33 @@
+{
+  "issue": {
+    "number": 63,
+    "title": "[Sev2] orders-api-latency-p95 fired for orders-api",
+    "body": "Alert orders-api-latency-p95 fired at 2026-11-16T13:52:00Z.\n\n95th percentile response time of orders-api above 2 seconds for 5 minutes.\n\nRunbook: high-latency",
+    "user": {
+      "login": "orders-alerts[bot]",
+      "type": "Bot"
+    },
+    "state": "open",
+    "created_at": "2026-11-16T13:52:10Z",
+    "labels": [
+      {
+        "name": "incident"
+      },
+      {
+        "name": "sev2"
+      }
+    ]
+  },
+  "comments": [
+    {
+      "id": 3150001,
+      "user": {
+        "login": "oncall-engineer",
+        "type": "User"
+      },
+      "author_association": "MEMBER",
+      "created_at": "2026-11-16T13:57:00Z",
+      "body": "Product pages are very slow. Asked the inventory team, they say nothing changed on their side. Asked the agent for a triage."
+    }
+  ]
+}

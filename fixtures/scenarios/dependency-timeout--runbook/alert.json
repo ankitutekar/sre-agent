@@ -1,0 +1,53 @@
+{
+  "schemaId": "azureMonitorCommonAlertSchema",
+  "data": {
+    "essentials": {
+      "alertId": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.AlertsManagement/alerts/5123d029-ac76-2eda-8887-fb09456a93ad",
+      "alertRule": "orders-api-latency-p95",
+      "severity": "Sev2",
+      "signalType": "Log",
+      "monitorCondition": "Fired",
+      "monitoringService": "Log Alerts V2",
+      "alertTargetIDs": [
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.OperationalInsights/workspaces/law-orders-demo"
+      ],
+      "configurationItems": [
+        "orders-api"
+      ],
+      "originAlertId": "e922dd73-orders-api-latency-p95-20261116T135200Z",
+      "firedDateTime": "2026-11-16T13:52:00.0000000Z",
+      "description": "95th percentile response time of orders-api above 2 seconds for 5 minutes.",
+      "essentialsVersion": "1.0",
+      "alertContextVersion": "1.0"
+    },
+    "alertContext": {
+      "properties": {},
+      "conditionType": "LogQueryCriteria",
+      "condition": {
+        "windowSize": "PT5M",
+        "allOf": [
+          {
+            "searchQuery": "AppRequests | where AppRoleName == \"orders-api\" | summarize P95 = percentile(DurationMs, 95)",
+            "metricMeasureColumn": "P95",
+            "targetResourceTypes": "['Microsoft.OperationalInsights/workspaces']",
+            "operator": "GreaterThan",
+            "threshold": "2000",
+            "timeAggregation": "Average",
+            "dimensions": [],
+            "metricValue": 4870.0,
+            "failingPeriods": {
+              "numberOfEvaluationPeriods": 1,
+              "minFailingPeriodsToAlert": 1
+            }
+          }
+        ],
+        "windowStartTime": "2026-11-16T13:47:00Z",
+        "windowEndTime": "2026-11-16T13:52:00Z"
+      }
+    },
+    "customProperties": {
+      "runbook": "high-latency",
+      "team": "orders"
+    }
+  }
+}

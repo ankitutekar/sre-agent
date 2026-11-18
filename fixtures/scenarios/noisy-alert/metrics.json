@@ -1,0 +1,595 @@
+{
+  "cost": 0,
+  "timespan": "2026-11-19T02:50:00Z/2026-11-19T03:10:00Z",
+  "interval": "PT1M",
+  "value": [
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.App/containerApps/orders-api/providers/Microsoft.Insights/metrics/Requests",
+      "type": "Microsoft.Insights/metrics",
+      "name": {
+        "value": "Requests",
+        "localizedValue": "Requests"
+      },
+      "unit": "Count",
+      "timeseries": [
+        {
+          "metadatavalues": [
+            {
+              "name": {
+                "value": "statusCodeCategory",
+                "localizedValue": "statusCodeCategory"
+              },
+              "value": "2xx"
+            }
+          ],
+          "data": [
+            {
+              "timeStamp": "2026-11-19T02:50:00Z",
+              "total": 36
+            },
+            {
+              "timeStamp": "2026-11-19T02:51:00Z",
+              "total": 41
+            },
+            {
+              "timeStamp": "2026-11-19T02:52:00Z",
+              "total": 38
+            },
+            {
+              "timeStamp": "2026-11-19T02:53:00Z",
+              "total": 40
+            },
+            {
+              "timeStamp": "2026-11-19T02:54:00Z",
+              "total": 41
+            },
+            {
+              "timeStamp": "2026-11-19T02:55:00Z",
+              "total": 38
+            },
+            {
+              "timeStamp": "2026-11-19T02:56:00Z",
+              "total": 40
+            },
+            {
+              "timeStamp": "2026-11-19T02:57:00Z",
+              "total": 36
+            },
+            {
+              "timeStamp": "2026-11-19T02:58:00Z",
+              "total": 40
+            },
+            {
+              "timeStamp": "2026-11-19T02:59:00Z",
+              "total": 36
+            },
+            {
+              "timeStamp": "2026-11-19T03:00:00Z",
+              "total": 145
+            },
+            {
+              "timeStamp": "2026-11-19T03:01:00Z",
+              "total": 143
+            },
+            {
+              "timeStamp": "2026-11-19T03:02:00Z",
+              "total": 146
+            },
+            {
+              "timeStamp": "2026-11-19T03:03:00Z",
+              "total": 139
+            },
+            {
+              "timeStamp": "2026-11-19T03:04:00Z",
+              "total": 42
+            },
+            {
+              "timeStamp": "2026-11-19T03:05:00Z",
+              "total": 38
+            },
+            {
+              "timeStamp": "2026-11-19T03:06:00Z",
+              "total": 38
+            },
+            {
+              "timeStamp": "2026-11-19T03:07:00Z",
+              "total": 43
+            },
+            {
+              "timeStamp": "2026-11-19T03:08:00Z",
+              "total": 36
+            },
+            {
+              "timeStamp": "2026-11-19T03:09:00Z",
+              "total": 44
+            }
+          ]
+        },
+        {
+          "metadatavalues": [
+            {
+              "name": {
+                "value": "statusCodeCategory",
+                "localizedValue": "statusCodeCategory"
+              },
+              "value": "5xx"
+            }
+          ],
+          "data": [
+            {
+              "timeStamp": "2026-11-19T02:50:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:51:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:52:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:53:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:54:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:55:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:56:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:57:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:58:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T02:59:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:00:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:01:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:02:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:03:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:04:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:05:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:06:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:07:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:08:00Z",
+              "total": 0
+            },
+            {
+              "timeStamp": "2026-11-19T03:09:00Z",
+              "total": 0
+            }
+          ]
+        }
+      ],
+      "errorCode": "Success"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.App/containerApps/orders-api/providers/Microsoft.Insights/metrics/ResponseTime",
+      "type": "Microsoft.Insights/metrics",
+      "name": {
+        "value": "ResponseTime",
+        "localizedValue": "Average Response Time (Preview)"
+      },
+      "unit": "MilliSeconds",
+      "timeseries": [
+        {
+          "metadatavalues": [],
+          "data": [
+            {
+              "timeStamp": "2026-11-19T02:50:00Z",
+              "average": 62
+            },
+            {
+              "timeStamp": "2026-11-19T02:51:00Z",
+              "average": 59
+            },
+            {
+              "timeStamp": "2026-11-19T02:52:00Z",
+              "average": 57
+            },
+            {
+              "timeStamp": "2026-11-19T02:53:00Z",
+              "average": 57
+            },
+            {
+              "timeStamp": "2026-11-19T02:54:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T02:55:00Z",
+              "average": 57
+            },
+            {
+              "timeStamp": "2026-11-19T02:56:00Z",
+              "average": 59
+            },
+            {
+              "timeStamp": "2026-11-19T02:57:00Z",
+              "average": 56
+            },
+            {
+              "timeStamp": "2026-11-19T02:58:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T02:59:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T03:00:00Z",
+              "average": 930
+            },
+            {
+              "timeStamp": "2026-11-19T03:01:00Z",
+              "average": 1080
+            },
+            {
+              "timeStamp": "2026-11-19T03:02:00Z",
+              "average": 1010
+            },
+            {
+              "timeStamp": "2026-11-19T03:03:00Z",
+              "average": 870
+            },
+            {
+              "timeStamp": "2026-11-19T03:04:00Z",
+              "average": 61
+            },
+            {
+              "timeStamp": "2026-11-19T03:05:00Z",
+              "average": 56
+            },
+            {
+              "timeStamp": "2026-11-19T03:06:00Z",
+              "average": 60
+            },
+            {
+              "timeStamp": "2026-11-19T03:07:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T03:08:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T03:09:00Z",
+              "average": 58
+            }
+          ]
+        }
+      ],
+      "errorCode": "Success"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.App/containerApps/orders-api/providers/Microsoft.Insights/metrics/CpuPercentage",
+      "type": "Microsoft.Insights/metrics",
+      "name": {
+        "value": "CpuPercentage",
+        "localizedValue": "CPU Usage Percentage (Preview)"
+      },
+      "unit": "Percent",
+      "timeseries": [
+        {
+          "metadatavalues": [],
+          "data": [
+            {
+              "timeStamp": "2026-11-19T02:50:00Z",
+              "average": 16
+            },
+            {
+              "timeStamp": "2026-11-19T02:51:00Z",
+              "average": 17
+            },
+            {
+              "timeStamp": "2026-11-19T02:52:00Z",
+              "average": 16
+            },
+            {
+              "timeStamp": "2026-11-19T02:53:00Z",
+              "average": 18
+            },
+            {
+              "timeStamp": "2026-11-19T02:54:00Z",
+              "average": 14
+            },
+            {
+              "timeStamp": "2026-11-19T02:55:00Z",
+              "average": 14
+            },
+            {
+              "timeStamp": "2026-11-19T02:56:00Z",
+              "average": 18
+            },
+            {
+              "timeStamp": "2026-11-19T02:57:00Z",
+              "average": 14
+            },
+            {
+              "timeStamp": "2026-11-19T02:58:00Z",
+              "average": 16
+            },
+            {
+              "timeStamp": "2026-11-19T02:59:00Z",
+              "average": 15
+            },
+            {
+              "timeStamp": "2026-11-19T03:00:00Z",
+              "average": 44
+            },
+            {
+              "timeStamp": "2026-11-19T03:01:00Z",
+              "average": 47
+            },
+            {
+              "timeStamp": "2026-11-19T03:02:00Z",
+              "average": 45
+            },
+            {
+              "timeStamp": "2026-11-19T03:03:00Z",
+              "average": 41
+            },
+            {
+              "timeStamp": "2026-11-19T03:04:00Z",
+              "average": 14
+            },
+            {
+              "timeStamp": "2026-11-19T03:05:00Z",
+              "average": 16
+            },
+            {
+              "timeStamp": "2026-11-19T03:06:00Z",
+              "average": 16
+            },
+            {
+              "timeStamp": "2026-11-19T03:07:00Z",
+              "average": 18
+            },
+            {
+              "timeStamp": "2026-11-19T03:08:00Z",
+              "average": 17
+            },
+            {
+              "timeStamp": "2026-11-19T03:09:00Z",
+              "average": 17
+            }
+          ]
+        }
+      ],
+      "errorCode": "Success"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.App/containerApps/orders-api/providers/Microsoft.Insights/metrics/MemoryPercentage",
+      "type": "Microsoft.Insights/metrics",
+      "name": {
+        "value": "MemoryPercentage",
+        "localizedValue": "Memory Percentage (Preview)"
+      },
+      "unit": "Percent",
+      "timeseries": [
+        {
+          "metadatavalues": [],
+          "data": [
+            {
+              "timeStamp": "2026-11-19T02:50:00Z",
+              "average": 57
+            },
+            {
+              "timeStamp": "2026-11-19T02:51:00Z",
+              "average": 55
+            },
+            {
+              "timeStamp": "2026-11-19T02:52:00Z",
+              "average": 57
+            },
+            {
+              "timeStamp": "2026-11-19T02:53:00Z",
+              "average": 56
+            },
+            {
+              "timeStamp": "2026-11-19T02:54:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T02:55:00Z",
+              "average": 56
+            },
+            {
+              "timeStamp": "2026-11-19T02:56:00Z",
+              "average": 56
+            },
+            {
+              "timeStamp": "2026-11-19T02:57:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T02:58:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T02:59:00Z",
+              "average": 55
+            },
+            {
+              "timeStamp": "2026-11-19T03:00:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T03:01:00Z",
+              "average": 55
+            },
+            {
+              "timeStamp": "2026-11-19T03:02:00Z",
+              "average": 55
+            },
+            {
+              "timeStamp": "2026-11-19T03:03:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T03:04:00Z",
+              "average": 57
+            },
+            {
+              "timeStamp": "2026-11-19T03:05:00Z",
+              "average": 58
+            },
+            {
+              "timeStamp": "2026-11-19T03:06:00Z",
+              "average": 57
+            },
+            {
+              "timeStamp": "2026-11-19T03:07:00Z",
+              "average": 57
+            },
+            {
+              "timeStamp": "2026-11-19T03:08:00Z",
+              "average": 55
+            },
+            {
+              "timeStamp": "2026-11-19T03:09:00Z",
+              "average": 56
+            }
+          ]
+        }
+      ],
+      "errorCode": "Success"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.App/containerApps/orders-api/providers/Microsoft.Insights/metrics/Replicas",
+      "type": "Microsoft.Insights/metrics",
+      "name": {
+        "value": "Replicas",
+        "localizedValue": "Replica Count"
+      },
+      "unit": "Count",
+      "timeseries": [
+        {
+          "metadatavalues": [],
+          "data": [
+            {
+              "timeStamp": "2026-11-19T02:50:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:51:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:52:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:53:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:54:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:55:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:56:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:57:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:58:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T02:59:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:00:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:01:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:02:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:03:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:04:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:05:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:06:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:07:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:08:00Z",
+              "maximum": 2
+            },
+            {
+              "timeStamp": "2026-11-19T03:09:00Z",
+              "maximum": 2
+            }
+          ]
+        }
+      ],
+      "errorCode": "Success"
+    }
+  ],
+  "namespace": "microsoft.app/containerapps",
+  "resourceregion": "swedencentral"
+}

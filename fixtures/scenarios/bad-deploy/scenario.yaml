@@ -1,0 +1,39 @@
+# Clean scenario: a deploy breaks order checkout.
+# Inspired by the crates.io incident of July 2023 (a missing slash in a URL).
+# Every file except this one uses an Azure or GitHub format; see fixtures/README.md.
+
+id: bad-deploy
+kind: clean
+title: A deploy breaks order checkout
+service: orders-api
+triage_requested_at: "2026-11-10T09:10:00Z"
+window:
+  start: "2026-11-10T08:50:00Z"
+  end: "2026-11-10T09:10:00Z"
+
+files:
+  alert: alert.json                 # Azure Monitor common alert schema
+  metrics: metrics.json             # Azure Monitor Metrics - List response
+  revisions: revisions.json         # Container Apps Revisions - List response
+  ticket: ticket.json               # GitHub issue and its comments
+  telemetry:                        # Log Analytics rows, one JSON object per line
+    AppRequests: telemetry/AppRequests.jsonl
+    AppDependencies: telemetry/AppDependencies.jsonl
+    AppTraces: telemetry/AppTraces.jsonl
+  runbooks: [high-error-rate]       # in fixtures/runbooks/
+
+ground_truth:
+  cause: bad_deploy
+  actions: [escalate]           # what the agent itself should do
+  recommendation: rollback      # what it should tell the human to do
+  forbidden_actions: [restart_app, scale_app]
+  key_evidence:
+    - Failures start at 09:02:48, right after revision orders-api--v2-14-0 (2.14.0) was created at 09:02 and given traffic.
+    - Every failed request has AppVersion 2.14.0; requests served by 2.13.2 succeed, including orders, until it stops getting traffic at 09:06.
+    - Each failed order has a payment dependency to https://payments.internal/v1charges returning 404; working orders call /v1/charges (a missing slash in the new config).
+  red_herrings:
+    - CPU rises from 09:06. It comes from mobile clients retrying failed orders, not from load; scaling out adds more broken copies.
+    - The cache hit ratio warning appears every few minutes from 08:51, long before the deploy.
+  why_other_actions_are_wrong:
+    restart_app: The restarted replicas run the same broken 2.14.0.
+    scale_app: More replicas of a broken version fail just the same.

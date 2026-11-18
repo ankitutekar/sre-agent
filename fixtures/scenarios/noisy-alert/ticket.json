@@ -1,0 +1,33 @@
+{
+  "issue": {
+    "number": 78,
+    "title": "[Sev3] orders-api-latency-p95-night fired for orders-api",
+    "body": "Alert orders-api-latency-p95-night fired at 2026-11-19T03:05:00Z.\n\n95th percentile response time of orders-api above 800 ms for 5 minutes.\n\nRunbook: high-latency",
+    "user": {
+      "login": "orders-alerts[bot]",
+      "type": "Bot"
+    },
+    "state": "open",
+    "created_at": "2026-11-19T03:05:10Z",
+    "labels": [
+      {
+        "name": "incident"
+      },
+      {
+        "name": "sev3"
+      }
+    ]
+  },
+  "comments": [
+    {
+      "id": 3900001,
+      "user": {
+        "login": "oncall-engineer",
+        "type": "User"
+      },
+      "author_association": "MEMBER",
+      "created_at": "2026-11-19T03:07:00Z",
+      "body": "Latency page at 3 am. I can't see any user reports. Asked the agent for a triage."
+    }
+  ]
+}

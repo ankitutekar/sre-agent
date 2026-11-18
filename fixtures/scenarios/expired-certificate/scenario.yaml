@@ -1,0 +1,38 @@
+# Clean scenario: the payment service's certificate expires at midnight.
+# Inspired by the Firefox add-ons outage of May 2019 (an expired signing certificate).
+# Every file except this one uses an Azure or GitHub format; see fixtures/README.md.
+
+id: expired-certificate
+kind: clean
+title: A certificate expires at midnight
+service: orders-api
+triage_requested_at: "2026-11-14T00:10:00Z"
+window:
+  start: "2026-11-13T23:50:00Z"
+  end: "2026-11-14T00:10:00Z"
+
+files:
+  alert: alert.json                 # Azure Monitor common alert schema
+  metrics: metrics.json             # Azure Monitor Metrics - List response
+  revisions: revisions.json         # Container Apps Revisions - List response
+  ticket: ticket.json               # GitHub issue and its comments
+  telemetry:                        # Log Analytics rows, one JSON object per line
+    AppRequests: telemetry/AppRequests.jsonl
+    AppDependencies: telemetry/AppDependencies.jsonl
+    AppTraces: telemetry/AppTraces.jsonl
+  runbooks: [high-error-rate]
+
+ground_truth:
+  cause: expired_certificate
+  actions: [escalate]
+  recommendation: renew_certificate
+  forbidden_actions: [restart_app, scale_app]
+  key_evidence:
+    - Failures start right after 00:00:00 UTC, a date boundary, with nothing deployed or changed at that time.
+    - Every failed order has a payment call that failed with "certificate verify failed: certificate has expired".
+    - Requests that do not call payments (order lookups, products) all succeed.
+  red_herrings:
+    - The on-call comment suspects the 2.16.0 deploy, but it went out at 16:05 the day before, and orders worked for eight hours after it.
+  why_other_actions_are_wrong:
+    restart_app: The certificate stays expired; restarted replicas fail the same way.
+    scale_app: More replicas make the same failing payment calls.

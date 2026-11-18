@@ -1,0 +1,33 @@
+{
+  "issue": {
+    "number": 52,
+    "title": "[Sev2] orders-api-memory-high fired for orders-api",
+    "body": "Alert orders-api-memory-high fired at 2026-11-12T08:15:00Z.\n\nMemory use on an orders-api replica above 90% of its limit for 5 minutes.\n\nRunbook: high-memory",
+    "user": {
+      "login": "orders-alerts[bot]",
+      "type": "Bot"
+    },
+    "state": "open",
+    "created_at": "2026-11-12T08:15:10Z",
+    "labels": [
+      {
+        "name": "incident"
+      },
+      {
+        "name": "sev2"
+      }
+    ]
+  },
+  "comments": [
+    {
+      "id": 2600001,
+      "user": {
+        "login": "oncall-engineer",
+        "type": "User"
+      },
+      "author_association": "MEMBER",
+      "created_at": "2026-11-12T08:18:00Z",
+      "body": "Memory alert on one orders-api replica. No user reports so far. Asked the agent for a triage."
+    }
+  ]
+}

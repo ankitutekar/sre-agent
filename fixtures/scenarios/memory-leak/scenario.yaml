@@ -1,0 +1,38 @@
+# Clean scenario: a memory leak makes replicas restart every 100 minutes or so.
+# Every file except this one uses an Azure or GitHub format; see fixtures/README.md.
+
+id: memory-leak
+kind: clean
+title: A memory leak restarts replicas
+service: orders-api
+triage_requested_at: "2026-11-12T08:20:00Z"
+window:
+  start: "2026-11-12T05:20:00Z"
+  end: "2026-11-12T08:20:00Z"
+
+files:
+  alert: alert.json                 # Azure Monitor common alert schema
+  metrics: metrics.json             # Azure Monitor Metrics - List response
+  revisions: revisions.json         # Container Apps Revisions - List response
+  ticket: ticket.json               # GitHub issue and its comments
+  telemetry:                        # Log Analytics rows, one JSON object per line
+    AppRequests: telemetry/AppRequests.jsonl
+    AppDependencies: telemetry/AppDependencies.jsonl
+    AppTraces: telemetry/AppTraces.jsonl
+  runbooks: [high-memory]
+
+ground_truth:
+  cause: memory_leak
+  actions: [restart_app, escalate]  # a restart buys time before the next crash; the code still needs fixing
+  recommendation: fix_code
+  forbidden_actions: [scale_app]
+  key_evidence:
+    - Memory on each replica rises steadily (about 0.6 points a minute) and only drops when the replica restarts.
+    - RestartCount goes up when a replica reaches about 100% memory (05:55 and 07:35 on one replica, 06:53 on the other).
+    - The "Order lookup cache size" log grows steadily and resets after each restart.
+    - Replica orders-api--v2-14-1-7f6d9c8b4-w7n2x is above 90% and will run out in about 15 minutes.
+  red_herrings:
+    - Payments returned 503 for about a minute at 07:02; one retry fixed every order, and it is unrelated to memory.
+    - The last deploy (2.14.1) was six days ago, so "what touched it last" points nowhere useful today. Rolling back is not an option either; the previous revision is the broken 2.14.0.
+  why_other_actions_are_wrong:
+    scale_app: Every new replica leaks the same way; it only delays the next crash and costs more.

@@ -1,0 +1,67 @@
+{
+  "nextLink": null,
+  "value": [
+    {
+      "name": "orders-api--v2-14-0",
+      "type": "Microsoft.App/containerApps/revisions",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.App/containerApps/orders-api/revisions/orders-api--v2-14-0",
+      "properties": {
+        "active": true,
+        "createdTime": "2026-11-10T09:02:00+00:00",
+        "replicas": 2,
+        "healthState": "Healthy",
+        "provisioningState": "Provisioned",
+        "runningState": "Running",
+        "trafficWeight": 100,
+        "template": {
+          "containers": [
+            {
+              "name": "orders-api",
+              "image": "crordersdemo.azurecr.io/orders-api:2.14.0",
+              "resources": {
+                "cpu": 0.5,
+                "memory": "1Gi"
+              }
+            }
+          ],
+          "revisionSuffix": "v2-14-0",
+          "scale": {
+            "minReplicas": 2,
+            "maxReplicas": 5
+          }
+        }
+      }
+    },
+    {
+      "name": "orders-api--v2-13-2",
+      "type": "Microsoft.App/containerApps/revisions",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.App/containerApps/orders-api/revisions/orders-api--v2-13-2",
+      "properties": {
+        "active": true,
+        "createdTime": "2026-11-07T14:20:00+00:00",
+        "replicas": 2,
+        "healthState": "Healthy",
+        "provisioningState": "Provisioned",
+        "runningState": "Running",
+        "trafficWeight": 0,
+        "template": {
+          "containers": [
+            {
+              "name": "orders-api",
+              "image": "crordersdemo.azurecr.io/orders-api:2.13.2",
+              "resources": {
+                "cpu": 0.5,
+                "memory": "1Gi"
+              }
+            }
+          ],
+          "revisionSuffix": "v2-13-2",
+          "scale": {
+            "minReplicas": 2,
+            "maxReplicas": 5
+          }
+        }
+      }
+    }
+  ]
+}
