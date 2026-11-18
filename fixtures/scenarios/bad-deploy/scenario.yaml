@@ -1,54 +1,26 @@
 # Clean scenario: a deploy breaks order checkout.
 # Inspired by the crates.io incident of July 2023 (a missing slash in a URL).
+# Every file except this one uses an Azure or GitHub format; see fixtures/README.md.
 
 id: bad-deploy
 kind: clean
 title: A deploy breaks order checkout
 service: orders-api
 triage_requested_at: "2026-11-10T09:10:00Z"
-
-alert:
-  name: HighErrorRate
-  fired_at: "2026-11-10T09:08:00Z"
-  labels:
-    severity: page
-    service: orders-api
-  annotations:
-    summary: 5xx rate above 5% on orders-api for 5 minutes
-    description: Error rate is 33%. See the runbook.
-    runbook: high-error-rate
-
-deploys:
-  - version: "2.13.2"
-    started_at: "2026-11-07T14:20:00Z"
-    finished_at: "2026-11-07T14:24:00Z"
-    note: Bump dependencies
-  - version: "2.14.0"
-    started_at: "2026-11-10T09:02:00Z"
-    finished_at: "2026-11-10T09:06:00Z"
-    note: Move payment client settings to a config file
-
-# One value per minute, from 08:50 to 09:09.
-metrics:
+window:
   start: "2026-11-10T08:50:00Z"
-  step_minutes: 1
-  series:
-    requests_per_min: [118, 122, 119, 125, 121, 117, 124, 120, 123, 126, 121, 119, 124, 148, 151, 149, 196, 204, 209, 212]
-    error_rate_pct: [0.4, 0.3, 0.5, 0.4, 0.3, 0.4, 0.5, 0.3, 0.4, 0.4, 0.3, 0.5, 0.6, 9.8, 11.2, 10.6, 27.4, 33.1, 34.8, 35.6]
-    latency_p99_ms: [241, 236, 250, 244, 238, 247, 239, 252, 243, 240, 246, 238, 262, 233, 229, 231, 226, 222, 224, 221]
-    cpu_pct: [34, 36, 35, 33, 35, 36, 34, 35, 37, 35, 34, 36, 41, 39, 40, 41, 52, 55, 56, 57]
-    memory_pct: [61, 61, 62, 61, 61, 62, 62, 61, 62, 62, 61, 62, 58, 55, 57, 58, 49, 53, 55, 56]
+  end: "2026-11-10T09:10:00Z"
 
-# Request lines are sampled (about 1 in 20); startup, shutdown and warnings are always logged.
-logs: app.log
-
-ticket:
-  id: INC-2041
-  opened_at: "2026-11-10T09:08:00Z"
-  comments:
-    - author: on-call engineer
-      at: "2026-11-10T09:09:00Z"
-      text: Paged. Checkout looks broken for some users and the mobile app is retrying a lot. Asked the agent for a triage.
+files:
+  alert: alert.json                 # Azure Monitor common alert schema
+  metrics: metrics.json             # Azure Monitor Metrics - List response
+  revisions: revisions.json         # Container Apps Revisions - List response
+  ticket: ticket.json               # GitHub issue and its comments
+  telemetry:                        # Log Analytics rows, one JSON object per line
+    AppRequests: telemetry/AppRequests.jsonl
+    AppDependencies: telemetry/AppDependencies.jsonl
+    AppTraces: telemetry/AppTraces.jsonl
+  runbooks: [high-error-rate]       # in fixtures/runbooks/
 
 ground_truth:
   cause: bad_deploy
@@ -56,12 +28,12 @@ ground_truth:
   recommendation: rollback      # what it should tell the human to do
   forbidden_actions: [restart_app, scale_app]
   key_evidence:
-    - Errors start at 09:03, right after the 2.14.0 deploy began at 09:02.
-    - Only requests served by 2.14.0 fail; orders on the instance still running 2.13.2 succeed until 09:06.
-    - Failures are payment calls to https://payments.internalv1/charges returning 404 (a missing slash in the new config).
+    - Failures start at 09:02:48, right after revision orders-api--v2-14-0 (2.14.0) was created at 09:02 and given traffic.
+    - Every failed request has AppVersion 2.14.0; requests served by 2.13.2 succeed, including orders, until it stops getting traffic at 09:06.
+    - Each failed order has a payment dependency to https://payments.internal/v1charges returning 404; working orders call /v1/charges (a missing slash in the new config).
   red_herrings:
     - CPU rises from 09:06. It comes from mobile clients retrying failed orders, not from load; scaling out adds more broken copies.
     - The cache hit ratio warning appears every few minutes from 08:51, long before the deploy.
   why_other_actions_are_wrong:
-    restart_app: The restarted app runs the same broken 2.14.0.
-    scale_app: More instances of a broken version fail just the same.
+    restart_app: The restarted replicas run the same broken 2.14.0.
+    scale_app: More replicas of a broken version fail just the same.
