@@ -1,0 +1,53 @@
+{
+  "schemaId": "azureMonitorCommonAlertSchema",
+  "data": {
+    "essentials": {
+      "alertId": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.AlertsManagement/alerts/9a522ba5-66ca-7c49-6295-67bc7270dd25",
+      "alertRule": "orders-api-memory-high",
+      "severity": "Sev2",
+      "signalType": "Metric",
+      "monitorCondition": "Fired",
+      "monitoringService": "Platform",
+      "alertTargetIDs": [
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.App/containerApps/orders-api"
+      ],
+      "configurationItems": [
+        "orders-api"
+      ],
+      "originAlertId": "3f27e1df-orders-api-memory-high-20261112T081500Z",
+      "firedDateTime": "2026-11-12T08:15:00.0000000Z",
+      "description": "Memory use on an orders-api replica above 90% of its limit for 5 minutes.",
+      "essentialsVersion": "1.0",
+      "alertContextVersion": "1.0"
+    },
+    "alertContext": {
+      "properties": null,
+      "conditionType": "SingleResourceMultipleMetricCriteria",
+      "condition": {
+        "windowSize": "PT5M",
+        "allOf": [
+          {
+            "metricName": "MemoryPercentage",
+            "metricNamespace": "Microsoft.App/containerApps",
+            "operator": "GreaterThan",
+            "threshold": "90",
+            "timeAggregation": "Average",
+            "dimensions": [
+              {
+                "name": "podName",
+                "value": "orders-api--v2-14-1-7f6d9c8b4-w7n2x"
+              }
+            ],
+            "metricValue": 87.4
+          }
+        ],
+        "windowStartTime": "2026-11-12T08:10:00.000Z",
+        "windowEndTime": "2026-11-12T08:15:00.000Z"
+      }
+    },
+    "customProperties": {
+      "runbook": "high-memory",
+      "team": "orders"
+    }
+  }
+}

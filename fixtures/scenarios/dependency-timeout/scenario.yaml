@@ -1,0 +1,38 @@
+# Clean scenario: the inventory service slows down and calls to it time out.
+# Every file except this one uses an Azure or GitHub format; see fixtures/README.md.
+
+id: dependency-timeout
+kind: clean
+title: A slow dependency causes timeouts
+service: orders-api
+triage_requested_at: "2026-11-16T14:00:00Z"
+window:
+  start: "2026-11-16T13:40:00Z"
+  end: "2026-11-16T14:00:00Z"
+
+files:
+  alert: alert.json                 # Azure Monitor common alert schema
+  metrics: metrics.json             # Azure Monitor Metrics - List response
+  revisions: revisions.json         # Container Apps Revisions - List response
+  ticket: ticket.json               # GitHub issue and its comments
+  telemetry:                        # Log Analytics rows, one JSON object per line
+    AppRequests: telemetry/AppRequests.jsonl
+    AppDependencies: telemetry/AppDependencies.jsonl
+    AppTraces: telemetry/AppTraces.jsonl
+  runbooks: [high-latency]
+
+ground_truth:
+  cause: dependency_timeout
+  actions: [escalate]
+  recommendation: contact_dependency_owner
+  forbidden_actions: [restart_app, scale_app]
+  key_evidence:
+    - Calls to inventory.internal go from about 30 ms to several seconds from 13:46, and start hitting the 5-second timeout at 13:49.
+    - The slow and failing requests are exactly the ones that call inventory (product lists and new orders); order lookups stay fast.
+    - Payment calls and database queries stay at their usual speed.
+  red_herrings:
+    - The inventory team says nothing changed on their side; their service is still the one that is slow.
+    - Replicas scaled from 2 to 5 (the maximum) as requests piled up, which looks like a load problem; CPU actually fell, because replicas are waiting, not working.
+  why_other_actions_are_wrong:
+    restart_app: Inventory stays slow; restarted replicas wait on it just the same.
+    scale_app: Already at the maximum, and more replicas send more load to a struggling inventory service.
