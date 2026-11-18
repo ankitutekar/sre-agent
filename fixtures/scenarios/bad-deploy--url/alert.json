@@ -1,0 +1,53 @@
+{
+  "schemaId": "azureMonitorCommonAlertSchema",
+  "data": {
+    "essentials": {
+      "alertId": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.AlertsManagement/alerts/7c1e2f40-5a9b-4d3e-9f21-0b6c8d4e2a17",
+      "alertRule": "orders-api-5xx-rate",
+      "severity": "Sev1",
+      "signalType": "Log",
+      "monitorCondition": "Fired",
+      "monitoringService": "Log Alerts V2",
+      "alertTargetIDs": [
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-orders-demo/providers/Microsoft.OperationalInsights/workspaces/law-orders-demo"
+      ],
+      "configurationItems": [
+        "orders-api"
+      ],
+      "originAlertId": "3e8b0f1c-orders-api-5xx-rate-20261110T090800Z",
+      "firedDateTime": "2026-11-10T09:08:00.0000000Z",
+      "description": "More than 5% of requests to orders-api failed with a 5xx status for 5 minutes.",
+      "essentialsVersion": "1.0",
+      "alertContextVersion": "1.0"
+    },
+    "alertContext": {
+      "properties": {},
+      "conditionType": "LogQueryCriteria",
+      "condition": {
+        "windowSize": "PT5M",
+        "allOf": [
+          {
+            "searchQuery": "AppRequests | where AppRoleName == \"orders-api\" | summarize FailedPct = 100.0 * sumif(ItemCount, toint(ResultCode) >= 500) / sum(ItemCount)",
+            "metricMeasureColumn": "FailedPct",
+            "targetResourceTypes": "['Microsoft.OperationalInsights/workspaces']",
+            "operator": "GreaterThan",
+            "threshold": "5",
+            "timeAggregation": "Average",
+            "dimensions": [],
+            "metricValue": 33.1,
+            "failingPeriods": {
+              "numberOfEvaluationPeriods": 1,
+              "minFailingPeriodsToAlert": 1
+            }
+          }
+        ],
+        "windowStartTime": "2026-11-10T09:03:00Z",
+        "windowEndTime": "2026-11-10T09:08:00Z"
+      }
+    },
+    "customProperties": {
+      "runbook": "high-error-rate",
+      "team": "orders"
+    }
+  }
+}
