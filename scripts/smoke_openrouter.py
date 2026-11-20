@@ -82,6 +82,19 @@ class Exchange:
     response: JsonValue
 
 
+# Fields that identify the maintainer's account; removed from recordings (public repo).
+SCRUB_KEYS = frozenset({"user_id"})
+
+
+def scrub(value: JsonValue) -> JsonValue:
+    """A copy with every SCRUB_KEYS field removed, at any depth."""
+    if isinstance(value, dict):
+        return {k: scrub(v) for k, v in value.items() if k not in SCRUB_KEYS}
+    if isinstance(value, list):
+        return [scrub(v) for v in value]
+    return value
+
+
 class RecordingTransport(httpx.BaseTransport):
     """Wraps the real transport and keeps each request and response body (never headers)."""
 
@@ -165,7 +178,8 @@ class Smoke:
                 name,
                 "cost",
                 "INFO",
-                f"{result.usage.total_tokens} tokens, "
+                f"{result.usage.total_tokens} tokens "
+                f"({result.usage.reasoning_tokens} reasoning), "
                 + (f"${cost:.5f}" if cost is not None else "cost not reported"),
             )
         return result
@@ -285,9 +299,9 @@ def save_recordings(
         n = counters[ex.label] = counters.get(ex.label, 0) + 1
         body = {
             "label": ex.label,
-            "request": ex.request,
+            "request": scrub(ex.request),
             "status": ex.status,
-            "response": ex.response,
+            "response": scrub(ex.response),
         }
         files[out / f"{ex.label}-{n:02}.json"] = json.dumps(body, indent=2) + "\n"
     report = [vars(c) for c in checks]

@@ -52,6 +52,9 @@ class Route(BaseModel):
     served_as: tuple[str, ...]
     zdr: bool = False
     effort: Effort = "medium"
+    # Ask for adaptive thinking explicitly (OpenRouter `reasoning.enabled`). With effort
+    # alone, the first smoke test saw no reasoning at all on Bedrock (2026-11-20).
+    thinking: bool = True
 
 
 # Default route R1: Anthropic's own endpoint, standard retention (accepted risk).
@@ -181,7 +184,7 @@ class OpenRouterClient:
             "model": self.route.model,
             "messages": [_render_message(m) for m in messages],
             "max_tokens": max_tokens,
-            "reasoning": {"effort": self.route.effort},
+            "reasoning": _reasoning(self.route),
             "provider": provider,
         }
         if tools:
@@ -268,6 +271,13 @@ def _render_message(message: Message) -> dict[str, JsonValue]:
             }
         case _:
             assert_never(message)  # pyright errors here if a Message type is not handled
+
+
+def _reasoning(route: Route) -> dict[str, JsonValue]:
+    reasoning: dict[str, JsonValue] = {"effort": route.effort}
+    if route.thinking:
+        reasoning["enabled"] = True
+    return reasoning
 
 
 def _render_tool(tool: ToolSpec) -> dict[str, JsonValue]:

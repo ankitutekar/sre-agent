@@ -114,10 +114,16 @@ def test_body_pins_the_provider_and_denies_data_collection() -> None:
         "require_parameters": True,
         "data_collection": "deny",
     }
-    assert body["reasoning"] == {"effort": "medium"}
+    assert body["reasoning"] == {"effort": "medium", "enabled": True}
     assert body["max_tokens"] == 4000
     assert body["tool_choice"] == "auto"
     assert "models" not in body  # never a fallback model list
+
+
+def test_thinking_can_be_left_to_the_default() -> None:
+    route = ROUTE_ANTHROPIC.model_copy(update={"thinking": False})
+    body = _client(_ok(_response()), route).build_body(MESSAGES, [], max_tokens=10)
+    assert body["reasoning"] == {"effort": "medium"}
 
 
 def test_zdr_route_asks_for_zero_data_retention_on_bedrock() -> None:

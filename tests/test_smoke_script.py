@@ -179,7 +179,7 @@ def test_probe_runs_when_the_main_run_has_no_reasoning(tmp_path: Path) -> None:
     assert outcomes["r1-anthropic edited_history"] == "PASS"
     assert outcomes["cross cross_route"] == "PASS"
     probe = json.loads((tmp_path / "r1-anthropic" / "probe-01.json").read_text(encoding="utf-8"))
-    assert probe["request"]["reasoning"] == {"effort": "high"}
+    assert probe["request"]["reasoning"] == {"effort": "high", "enabled": True}
 
 
 def test_no_reasoning_after_probing_is_a_finding(tmp_path: Path) -> None:
@@ -217,3 +217,13 @@ def test_stale_recordings_are_removed(tmp_path: Path) -> None:
     smoke.save_recordings([], [], tmp_path, SecretStr(FAKE_KEY))
     assert not stale.exists()
     assert (tmp_path / "report.json").exists()
+
+
+def test_account_identifiers_are_scrubbed(tmp_path: Path) -> None:
+    response: JsonValue = {"error": {"message": "x"}, "user_id": "user_3Kabc"}
+    smoke.save_recordings(
+        [smoke.Exchange("r1/run", {}, 401, response)], [], tmp_path, SecretStr(FAKE_KEY)
+    )
+    text = (tmp_path / "r1" / "run-01.json").read_text(encoding="utf-8")
+    assert "user_3Kabc" not in text
+    assert '"message": "x"' in text
