@@ -55,7 +55,8 @@ FINAL_TURN: dict[str, JsonValue] = {
 
 
 def _fake_openrouter(script: list[str]) -> httpx.MockTransport:
-    """Answers requests in order: 'tools', 'final', 'reject' (400) or 'no_provider' (404)."""
+    """Answers requests in order: 'tools', 'plain' (no reasoning), 'final', 'reject' (400)
+    or 'no_provider' (404)."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert "authorization" in request.headers
@@ -67,7 +68,10 @@ def _fake_openrouter(script: list[str]) -> httpx.MockTransport:
             return httpx.Response(400, json={"error": {"message": "invalid signature"}})
         if kind == "no_provider":
             return httpx.Response(404, json={"error": {"message": "No endpoints found"}})
-        message = TOOLS_TURN if kind == "tools" else FINAL_TURN
+        if kind == "plain":  # a tool turn without reasoning (adaptive thinking skipped it)
+            message = {k: v for k, v in TOOLS_TURN.items() if k != "reasoning_details"}
+        else:
+            message = TOOLS_TURN if kind == "tools" else FINAL_TURN
         return httpx.Response(
             200,
             json={
@@ -157,3 +161,59 @@ def test_a_recording_containing_the_key_is_refused(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="refusing to write"):
         smoke.save_recordings([leak], [], tmp_path, SecretStr(FAKE_KEY))
     assert not list(tmp_path.iterdir())  # nothing written at all
+
+
+def test_probe_runs_when_the_main_run_has_no_reasoning(tmp_path: Path) -> None:
+    script = [
+        *("plain", "final", "tools", "final", "reject"),  # R1: run, probe, edited history
+        *("tools", "final", "reject"),  # R2: run has reasoning, so no probe
+        "reject",  # cross route
+    ]
+    checks = smoke.run_smoke(
+        transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path
+    )
+    assert not script
+    outcomes = _outcomes(checks)
+    assert outcomes["r1-anthropic probe"] == "INFO"
+    assert "r2-bedrock-zdr probe" not in outcomes
+    assert outcomes["r1-anthropic edited_history"] == "PASS"
+    assert outcomes["cross cross_route"] == "PASS"
+    probe = json.loads((tmp_path / "r1-anthropic" / "probe-01.json").read_text(encoding="utf-8"))
+    assert probe["request"]["reasoning"] == {"effort": "high"}
+
+
+def test_no_reasoning_after_probing_is_a_finding(tmp_path: Path) -> None:
+    script = [
+        *("plain", "final"),  # R1 run
+        *("plain", "final", "plain", "final"),  # two probes, still no reasoning
+        *("tools", "final", "reject"),  # R2
+    ]
+    checks = smoke.run_smoke(
+        transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path
+    )
+    assert not script
+    outcomes = _outcomes(checks)
+    assert outcomes["r1-anthropic probe"] == "FINDING"
+    assert outcomes["r1-anthropic edited_history"] == "FINDING"
+    assert outcomes["cross cross_route"] == "FINDING"
+
+
+def test_default_route_without_a_provider_is_a_failure(tmp_path: Path) -> None:
+    # What the first live run showed: an account-level ZDR setting removed Anthropic.
+    script = ["no_provider", "tools", "final", "reject"]
+    checks = smoke.run_smoke(
+        transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path
+    )
+    outcomes = _outcomes(checks)
+    assert outcomes["r1-anthropic run"] == "FAIL"
+    assert outcomes["r2-bedrock-zdr run"] == "PASS"
+    assert outcomes["cross cross_route"] == "FINDING"
+
+
+def test_stale_recordings_are_removed(tmp_path: Path) -> None:
+    stale = tmp_path / "r1-anthropic" / "probe-07.json"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("{}", encoding="utf-8")
+    smoke.save_recordings([], [], tmp_path, SecretStr(FAKE_KEY))
+    assert not stale.exists()
+    assert (tmp_path / "report.json").exists()

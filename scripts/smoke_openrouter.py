@@ -5,7 +5,7 @@ Run by the maintainer, in their own terminal, with OPENROUTER_API_KEY set:
     uv run python scripts/smoke_openrouter.py --live
 
 Without --live it only explains what it would do: no request, no key needed.
-About 10 requests on Claude Sonnet 5.5, a few cents in total.
+About 10-15 requests on Claude Sonnet 5.5, a few cents in total.
 
 For each route (R1 Anthropic, R2 Amazon Bedrock with ZDR) it checks:
   run             the toy agent finishes a two-tool task
@@ -13,6 +13,7 @@ For each route (R1 Anthropic, R2 Amazon Bedrock with ZDR) it checks:
   strict_args     the model's tool arguments always passed validation
   usage           cost and cache-token counts are present
   finish_reasons  finish_reason / native_finish_reason pairs (recorded)
+  probe           only if the run had no reasoning: the PROBE_TASK at effort high
   edited_history  a turn sent back with edited reasoning: rejected, or silently accepted?
 And once:
   cross_route     a conversation started on R1, continued on R2: must fail loudly
@@ -53,10 +54,11 @@ from sre_agent.harness import (
     offered_tools,
     run_agent,
 )
-from toy_agent import EXPECTED, SYSTEM, TASK, Triage, toy_tools
+from toy_agent import EXPECTED, PROBE_TASK, SYSTEM, TASK, Triage, toy_tools
 
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "tests" / "recordings" / "openrouter"
 LIMITS = Limits(max_turns=6, max_total_tokens=30_000)
+PROBE_ATTEMPTS = 2
 ROUTES: dict[str, Route] = {"r1-anthropic": ROUTE_ANTHROPIC, "r2-bedrock-zdr": ROUTE_BEDROCK_ZDR}
 
 _JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
@@ -132,7 +134,9 @@ class Smoke:
         elif result.ok:
             self.record(name, "run", "FAIL", f"wrong answer {result.answer!r}")
         else:
-            outcome: Outcome = "FINDING" if _no_provider(result.error) else "FAIL"
+            # "No eligible provider" is a finding on the ZDR route; the default route must work.
+            no_provider = route.zdr and _no_provider(result.error)
+            outcome: Outcome = "FINDING" if no_provider else "FAIL"
             self.record(name, "run", outcome, f"{result.stop_reason}: {result.error}")
 
         served = sorted({f"{r.model} via {r.provider}" for r in replies})
@@ -166,6 +170,41 @@ class Smoke:
             )
         return result
 
+    def reasoning_source(
+        self, name: str, route: Route, result: RunResult[Triage]
+    ) -> tuple[RunResult[Triage], Route] | None:
+        """A finished run with a reasoning turn, and the route that produced it.
+
+        Sonnet 5.5 thinks adaptively, so the main run may have none. Then run PROBE_TASK
+        at effort high, up to PROBE_ATTEMPTS times.
+        """
+        if _prefix_after_first_tool_turn(result.conversation) is not None:
+            return result, route
+        probe_route = route.model_copy(update={"effort": "high"})
+        for attempt in range(1, PROBE_ATTEMPTS + 1):
+            self.transport.label = f"{name}/probe"
+            probe = run_agent(
+                model=self.client(probe_route),
+                tools=toy_tools(),
+                system=SYSTEM,
+                task=PROBE_TASK,
+                answer_model=Triage,
+                limits=LIMITS,
+            )
+            if probe.ok and _prefix_after_first_tool_turn(probe.conversation) is not None:
+                self.record(
+                    name,
+                    "probe",
+                    "INFO",
+                    f"reasoning on attempt {attempt} at effort high "
+                    f"({probe.usage.reasoning_tokens} reasoning tokens)",
+                )
+                return probe, probe_route
+        self.record(
+            name, "probe", "FINDING", f"no reasoning in {PROBE_ATTEMPTS} attempts at effort high"
+        )
+        return None
+
     def edited_history(self, name: str, route: Route, result: RunResult[Triage]) -> None:
         prefix = _prefix_after_first_tool_turn(result.conversation)
         if prefix is None:
@@ -195,14 +234,16 @@ class Smoke:
             return
         self.record(name, "edited_history", "FINDING", f"accepted silently ({what})")
 
-    def cross_route(self, r1_result: RunResult[Triage]) -> None:
+    def cross_route(self, r1_result: RunResult[Triage], r1_route: Route) -> None:
         prefix = _prefix_after_first_tool_turn(r1_result.conversation)
         if prefix is None:
             self.record("cross", "cross_route", "FINDING", "skipped: R1 produced no reasoning turn")
             return
+        # Same effort as the R1 conversation, so the only difference is the provider.
+        target = ROUTE_BEDROCK_ZDR.model_copy(update={"effort": r1_route.effort})
         self.transport.label = "cross/cross_route"
         try:
-            self.client(ROUTE_BEDROCK_ZDR).complete(
+            self.client(target).complete(
                 [*prefix.before, prefix.turn, *prefix.results],
                 offered_tools(toy_tools(), Triage),
                 max_tokens=LIMITS.max_tokens_per_request,
@@ -215,13 +256,21 @@ class Smoke:
 
 def run_smoke(*, transport: httpx.BaseTransport, api_key: SecretStr, out: Path) -> list[Check]:
     smoke = Smoke(RecordingTransport(transport), api_key)
-    results: dict[str, RunResult[Triage]] = {}
+    sources: dict[str, tuple[RunResult[Triage], Route]] = {}
     for name, route in ROUTES.items():
-        results[name] = smoke.run_route(name, route)
-        if results[name].ok:
-            smoke.edited_history(name, route, results[name])
-    if results["r1-anthropic"].ok:
-        smoke.cross_route(results["r1-anthropic"])
+        result = smoke.run_route(name, route)
+        if not result.ok:
+            continue
+        source = smoke.reasoning_source(name, route, result)
+        if source is None:
+            smoke.record(name, "edited_history", "FINDING", "skipped: no turn with reasoning")
+            continue
+        sources[name] = source
+        smoke.edited_history(name, source[1], source[0])
+    if "r1-anthropic" in sources:
+        smoke.cross_route(*sources["r1-anthropic"])
+    else:
+        smoke.record("cross", "cross_route", "FINDING", "skipped: no R1 run with reasoning")
     save_recordings(smoke.transport.exchanges, smoke.checks, out, api_key)
     return smoke.checks
 
@@ -248,6 +297,9 @@ def save_recordings(
     leaking = [str(path) for path, text in files.items() if secret in text]
     if leaking:  # should be impossible: headers are never recorded
         raise RuntimeError(f"refusing to write recordings: the API key appears in {leaking}")
+    # Remove the previous run's recordings, so no stale file outlives a changed run.
+    for old in out.rglob("*.json") if out.exists() else ():
+        old.unlink()
     for path, text in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8", newline="\n")
@@ -363,7 +415,8 @@ def _tamper(raw: dict[str, JsonValue]) -> tuple[dict[str, JsonValue], str] | Non
 
 def _no_provider(error: str | None) -> bool:
     text = (error or "").lower()
-    return "no endpoints" in text or "no allowed providers" in text or "eligible" in text
+    markers = ("no endpoints", "endpoints out of", "no allowed providers", "eligible")
+    return any(marker in text for marker in markers)
 
 
 if __name__ == "__main__":

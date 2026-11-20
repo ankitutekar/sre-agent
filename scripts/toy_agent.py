@@ -13,6 +13,12 @@ SYSTEM = (
     "When you know the answer, call final_answer."
 )
 TASK = "What is the current status of payments-api, and which team owns it?"
+# A variant that invites reasoning, for the smoke test's edited-history check: Sonnet 5.5
+# thinks adaptively and often skips thinking on TASK. Same expected answer.
+PROBE_TASK = (
+    "Two services may be affected: payments-api and orders-api. Check both, work out "
+    "which one needs attention and why, then report that service and its owning team."
+)
 
 _STATUS = {"payments-api": "degraded", "orders-api": "healthy"}
 _OWNERS = {"payments-api": "team-payments", "orders-api": "team-orders"}
