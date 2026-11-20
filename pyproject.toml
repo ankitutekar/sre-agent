@@ -5,7 +5,10 @@ description = "SRE triage agent, governed by the Agent Governance Gateway"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.14.4",
+]
 
 [dependency-groups]
 dev = [
@@ -43,7 +46,7 @@ select = [
 
 [tool.pyright]
 include = ["src", "tests", ".claude/hooks"]
-extraPaths = ["src", ".claude/hooks"]
+extraPaths = ["src", "tests", ".claude/hooks"]  # tests: shared fakes (harness_fakes.py)
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 venvPath = "."
