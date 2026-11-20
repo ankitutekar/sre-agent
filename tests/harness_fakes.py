@@ -1,73 +1,27 @@
-"""Test doubles for the harness: a scripted model and two toy tools.
+"""Test doubles for the harness: a scripted model, plus the toy agent re-exported.
 
-The toy tools are the ones the step 1.3 smoke test uses: get_service_status and
-get_owner. Data is made up.
+The toy agent (tools, task, answer model) lives in scripts/toy_agent.py so the live
+smoke test and the offline tests share one definition.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel, JsonValue
+from pydantic import JsonValue
 
-from sre_agent.harness import (
-    LocalToolClient,
-    Message,
-    ModelError,
-    ModelTurn,
-    Tool,
-    ToolArgs,
-    ToolCall,
-    ToolError,
-    ToolSpec,
-    Usage,
-)
+from sre_agent.harness import Message, ModelError, ModelTurn, ToolCall, ToolSpec, Usage
+from toy_agent import ServiceArgs, Triage, get_owner, get_service_status, toy_tools
 
-# --- Toy tools ---
-
-_STATUS = {"payments-api": "degraded", "orders-api": "healthy"}
-_OWNERS = {"payments-api": "team-payments", "orders-api": "team-orders"}
-
-
-class ServiceArgs(ToolArgs):
-    service: str
-
-
-def _status(args: ServiceArgs) -> str:
-    if args.service not in _STATUS:
-        raise ToolError(f"no such service {args.service!r}")
-    return _STATUS[args.service]
-
-
-def _owner(args: ServiceArgs) -> str:
-    if args.service not in _OWNERS:
-        raise ToolError(f"no such service {args.service!r}")
-    return _OWNERS[args.service]
-
-
-get_service_status = Tool(
-    name="get_service_status",
-    description="Current health of a service: healthy, degraded or down.",
-    args_model=ServiceArgs,
-    fn=_status,
-)
-get_owner = Tool(
-    name="get_owner",
-    description="The team that owns a service.",
-    args_model=ServiceArgs,
-    fn=_owner,
-)
-
-
-def toy_tools() -> LocalToolClient:
-    return LocalToolClient([get_service_status, get_owner])
-
-
-class Triage(BaseModel):
-    """The toy agent's final answer."""
-
-    service: str
-    status: str
-    owner: str
+__all__ = [
+    "ScriptedModel",
+    "ServiceArgs",
+    "Triage",
+    "final",
+    "get_owner",
+    "get_service_status",
+    "toy_tools",
+    "turn",
+]
 
 
 # --- Scripted model ---

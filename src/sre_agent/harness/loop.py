@@ -84,17 +84,7 @@ def run_agent[T: BaseModel](
     """Run one task to a validated `answer_model`, or to a stated reason for stopping."""
     limits = limits or Limits()
     trace = trace or NoOpTrace()
-    tool_specs = list(tools.list_tools())
-    if any(spec.name == FINAL_ANSWER_TOOL for spec in tool_specs):
-        raise ValueError(f"{FINAL_ANSWER_TOOL!r} is reserved for the harness")
-    specs = (
-        *tool_specs,
-        ToolSpec(
-            name=FINAL_ANSWER_TOOL,
-            description=_FINAL_ANSWER_DESCRIPTION,
-            parameters=answer_model.model_json_schema(),
-        ),
-    )
+    specs = offered_tools(tools, answer_model)
 
     # Append-only: items are added, never changed or removed.
     conversation: list[Message] = [SystemMessage(text=system), UserMessage(text=task)]
@@ -139,6 +129,19 @@ def run_agent[T: BaseModel](
         conversation.extend(results)  # all results of a turn go back together
         if answer is not None:
             return stop(StopReason.COMPLETED, answer=answer)
+
+
+def offered_tools(tools: ToolClient, answer_model: type[BaseModel]) -> tuple[ToolSpec, ...]:
+    """The tools the model is offered on every turn: the client's tools plus final_answer."""
+    tool_specs = list(tools.list_tools())
+    if any(spec.name == FINAL_ANSWER_TOOL for spec in tool_specs):
+        raise ValueError(f"{FINAL_ANSWER_TOOL!r} is reserved for the harness")
+    final = ToolSpec(
+        name=FINAL_ANSWER_TOOL,
+        description=_FINAL_ANSWER_DESCRIPTION,
+        parameters=answer_model.model_json_schema(),
+    )
+    return (*tool_specs, final)
 
 
 def _early_stop(reply: ModelTurn) -> tuple[StopReason, str] | None:

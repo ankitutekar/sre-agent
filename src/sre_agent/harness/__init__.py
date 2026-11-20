@@ -3,7 +3,14 @@
 Import from here; the submodules are implementation detail.
 """
 
-from sre_agent.harness.loop import FINAL_ANSWER_TOOL, Limits, RunResult, StopReason, run_agent
+from sre_agent.harness.loop import (
+    FINAL_ANSWER_TOOL,
+    Limits,
+    RunResult,
+    StopReason,
+    offered_tools,
+    run_agent,
+)
 from sre_agent.harness.messages import (
     Message,
     ModelTurn,
@@ -72,5 +79,6 @@ __all__ = [
     "TraceHook",
     "Usage",
     "UserMessage",
+    "offered_tools",
     "run_agent",
 ]
