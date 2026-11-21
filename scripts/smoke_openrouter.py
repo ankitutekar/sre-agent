@@ -1,29 +1,33 @@
-"""Live smoke test of the model path (plan step 1.3, slice D; ADR 0008).
+"""Live smoke test of the model path (plan step 1.3, slices D and E; ADR 0008).
 
 Run by the maintainer, in their own terminal, with OPENROUTER_API_KEY set:
 
     uv run python scripts/smoke_openrouter.py --live
 
 Without --live it only explains what it would do: no request, no key needed.
-About 10-15 requests on Claude Sonnet 5.5, a few cents in total.
+About 25 requests on Claude Sonnet 5.5, under ten cents in total.
 
-For each route (R1 Anthropic, R2 Amazon Bedrock with ZDR) it checks:
+Four routes: R1 (Anthropic) and R2 (Amazon Bedrock with ZDR), each over both wire
+formats: Chat Completions (`r1`, `r2`) and the Messages endpoint (`r1m`, `r2m`).
+For each it checks:
   run             the toy agent finishes a two-tool task
   pin             every reply came from the pinned model and provider
   strict_args     the model's tool arguments always passed validation
   usage           cost and cache-token counts are present
+  reasoning       how many replies carried reasoning (thinking) blocks
   finish_reasons  finish_reason / native_finish_reason pairs (recorded)
   probe           only if the run had no reasoning: the PROBE_TASK at effort high
   edited_history  a turn sent back with edited reasoning: rejected, or silently accepted?
 And once:
-  cross_route     a conversation started on R1, continued on R2: must fail loudly
+  cross_route     a conversation started on Anthropic, continued on Bedrock over the
+                  same wire format: must fail loudly (the Messages one if it has reasoning)
 
 Outcomes: PASS, FINDING (unexpected but informative, e.g. "no eligible provider"
 on R2), FAIL (the harness or the route is broken), INFO (recorded only).
 
 Request and response bodies are saved to tests/recordings/openrouter/ for the
 offline tests. Headers are never saved, so the key cannot be in them; every file
-is also checked for the key before it is written.
+is also checked for the key before it is written, and account ids are removed.
 """
 
 import argparse
@@ -47,10 +51,13 @@ from sre_agent.harness import (
     Message,
     ModelError,
     ModelTurn,
+    OpenRouterBackend,
     OpenRouterClient,
+    OpenRouterMessagesClient,
     Route,
     RunResult,
     ToolResult,
+    Wire,
     offered_tools,
     run_agent,
 )
@@ -59,11 +66,27 @@ from toy_agent import EXPECTED, PROBE_TASK, SYSTEM, TASK, Triage, toy_tools
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "tests" / "recordings" / "openrouter"
 LIMITS = Limits(max_turns=6, max_total_tokens=30_000)
 PROBE_ATTEMPTS = 2
-ROUTES: dict[str, Route] = {"r1-anthropic": ROUTE_ANTHROPIC, "r2-bedrock-zdr": ROUTE_BEDROCK_ZDR}
 
 _JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 type Outcome = Literal["PASS", "FINDING", "FAIL", "INFO"]
+
+
+@dataclass(frozen=True)
+class SmokeRoute:
+    name: str
+    route: Route
+    wire: Wire
+
+
+ROUTES = (
+    SmokeRoute("r1-anthropic", ROUTE_ANTHROPIC, "chat_completions"),
+    SmokeRoute("r2-bedrock-zdr", ROUTE_BEDROCK_ZDR, "chat_completions"),
+    SmokeRoute("r1m-anthropic", ROUTE_ANTHROPIC, "messages"),
+    SmokeRoute("r2m-bedrock-zdr", ROUTE_BEDROCK_ZDR, "messages"),
+)
+# Where cross_route starts, in order of preference. Its target is Bedrock, same wire.
+CROSS_SOURCES = ("r1m-anthropic", "r1-anthropic")
 
 
 @dataclass(frozen=True)
@@ -120,18 +143,20 @@ class Smoke:
     api_key: SecretStr
     checks: list[Check] = field(default_factory=lambda: [])
 
-    def client(self, route: Route) -> OpenRouterClient:
+    def client(self, route: Route, wire: Wire) -> OpenRouterBackend:
         http = httpx.Client(transport=self.transport)
-        return OpenRouterClient(api_key=self.api_key, route=route, http=http)
+        backend = OpenRouterClient if wire == "chat_completions" else OpenRouterMessagesClient
+        return backend(api_key=self.api_key, route=route, http=http)
 
     def record(self, route: str, name: str, outcome: Outcome, detail: str) -> None:
         self.checks.append(Check(route, name, outcome, detail))
 
-    def run_route(self, name: str, route: Route) -> RunResult[Triage]:
+    def run_route(self, sr: SmokeRoute) -> RunResult[Triage]:
+        name = sr.name
         self.transport.label = f"{name}/run"
         first_exchange = len(self.transport.exchanges)
         result = run_agent(
-            model=self.client(route),
+            model=self.client(sr.route, sr.wire),
             tools=toy_tools(),
             system=SYSTEM,
             task=TASK,
@@ -148,7 +173,7 @@ class Smoke:
             self.record(name, "run", "FAIL", f"wrong answer {result.answer!r}")
         else:
             # "No eligible provider" is a finding on the ZDR route; the default route must work.
-            no_provider = route.zdr and _no_provider(result.error)
+            no_provider = sr.route.zdr and _no_provider(result.error)
             outcome: Outcome = "FINDING" if no_provider else "FAIL"
             self.record(name, "run", outcome, f"{result.stop_reason}: {result.error}")
 
@@ -170,7 +195,9 @@ class Smoke:
                 "FINDING" if invalid else "PASS",
                 "; ".join(invalid) if invalid else "all tool arguments valid",
             )
-            self.record(name, "usage", *_usage_check(exchanges))
+            self.record(name, "usage", *_usage_check(exchanges, sr.wire))
+            with_reasoning = sum(_has_reasoning(r) for r in replies)
+            self.record(name, "reasoning", "INFO", f"{with_reasoning} of {len(replies)} replies")
             pairs = [f"{r.finish_reason}/{r.native_finish_reason}" for r in replies]
             self.record(name, "finish_reasons", "INFO", ", ".join(pairs))
             cost = result.usage.cost
@@ -185,7 +212,7 @@ class Smoke:
         return result
 
     def reasoning_source(
-        self, name: str, route: Route, result: RunResult[Triage]
+        self, sr: SmokeRoute, result: RunResult[Triage]
     ) -> tuple[RunResult[Triage], Route] | None:
         """A finished run with a reasoning turn, and the route that produced it.
 
@@ -193,12 +220,12 @@ class Smoke:
         at effort high, up to PROBE_ATTEMPTS times.
         """
         if _prefix_after_first_tool_turn(result.conversation) is not None:
-            return result, route
-        probe_route = route.model_copy(update={"effort": "high"})
+            return result, sr.route
+        probe_route = sr.route.model_copy(update={"effort": "high"})
         for attempt in range(1, PROBE_ATTEMPTS + 1):
-            self.transport.label = f"{name}/probe"
+            self.transport.label = f"{sr.name}/probe"
             probe = run_agent(
-                model=self.client(probe_route),
+                model=self.client(probe_route, sr.wire),
                 tools=toy_tools(),
                 system=SYSTEM,
                 task=PROBE_TASK,
@@ -206,28 +233,22 @@ class Smoke:
                 limits=LIMITS,
             )
             if probe.ok and _prefix_after_first_tool_turn(probe.conversation) is not None:
-                self.record(
-                    name,
-                    "probe",
-                    "INFO",
-                    f"reasoning on attempt {attempt} at effort high "
-                    f"({probe.usage.reasoning_tokens} reasoning tokens)",
-                )
+                self.record(sr.name, "probe", "INFO", f"reasoning on attempt {attempt}")
                 return probe, probe_route
         self.record(
-            name, "probe", "FINDING", f"no reasoning in {PROBE_ATTEMPTS} attempts at effort high"
+            sr.name, "probe", "FINDING", f"no reasoning in {PROBE_ATTEMPTS} attempts at effort high"
         )
         return None
 
-    def edited_history(self, name: str, route: Route, result: RunResult[Triage]) -> None:
+    def edited_history(self, sr: SmokeRoute, route: Route, result: RunResult[Triage]) -> None:
         prefix = _prefix_after_first_tool_turn(result.conversation)
         if prefix is None:
-            self.record(name, "edited_history", "FINDING", "skipped: no turn with reasoning")
+            self.record(sr.name, "edited_history", "FINDING", "skipped: no turn with reasoning")
             return
         tampered = _tamper(prefix.turn.raw_message)
         if tampered is None:
             self.record(
-                name, "edited_history", "FINDING", "skipped: reasoning has no editable text"
+                sr.name, "edited_history", "FINDING", "skipped: reasoning has nothing to edit"
             )
             return
         edited, what = tampered
@@ -236,55 +257,66 @@ class Smoke:
             prefix.turn.model_copy(update={"raw_message": edited}),
             *prefix.results,
         ]
-        self.transport.label = f"{name}/edited_history"
+        self.transport.label = f"{sr.name}/edited_history"
         try:
-            self.client(route).complete(
+            self.client(route, sr.wire).complete(
                 messages,
                 offered_tools(toy_tools(), Triage),
                 max_tokens=LIMITS.max_tokens_per_request,
             )
         except ModelError as exc:
-            self.record(name, "edited_history", "PASS", f"rejected loudly ({what}): {exc}")
+            self.record(sr.name, "edited_history", "PASS", f"rejected loudly ({what}): {exc}")
             return
-        self.record(name, "edited_history", "FINDING", f"accepted silently ({what})")
+        self.record(sr.name, "edited_history", "FINDING", f"accepted silently ({what})")
 
-    def cross_route(self, r1_result: RunResult[Triage], r1_route: Route) -> None:
-        prefix = _prefix_after_first_tool_turn(r1_result.conversation)
+    def cross_route(self, sr: SmokeRoute, result: RunResult[Triage], route: Route) -> None:
+        prefix = _prefix_after_first_tool_turn(result.conversation)
         if prefix is None:
-            self.record("cross", "cross_route", "FINDING", "skipped: R1 produced no reasoning turn")
+            self.record("cross", "cross_route", "FINDING", "skipped: no reasoning turn")
             return
-        # Same effort as the R1 conversation, so the only difference is the provider.
-        target = ROUTE_BEDROCK_ZDR.model_copy(update={"effort": r1_route.effort})
+        # Same wire and effort as the source conversation: only the provider differs.
+        target = ROUTE_BEDROCK_ZDR.model_copy(update={"effort": route.effort})
         self.transport.label = "cross/cross_route"
         try:
-            self.client(target).complete(
+            self.client(target, sr.wire).complete(
                 [*prefix.before, prefix.turn, *prefix.results],
                 offered_tools(toy_tools(), Triage),
                 max_tokens=LIMITS.max_tokens_per_request,
             )
         except ModelError as exc:
-            self.record("cross", "cross_route", "PASS", f"failed loudly: {exc}")
+            self.record("cross", "cross_route", "PASS", f"from {sr.name}, failed loudly: {exc}")
             return
-        self.record("cross", "cross_route", "FINDING", "R2 accepted R1's reasoning without error")
+        self.record(
+            "cross", "cross_route", "FINDING", f"Bedrock accepted {sr.name}'s reasoning silently"
+        )
 
 
-def run_smoke(*, transport: httpx.BaseTransport, api_key: SecretStr, out: Path) -> list[Check]:
+def run_smoke(
+    *,
+    transport: httpx.BaseTransport,
+    api_key: SecretStr,
+    out: Path,
+    routes: Sequence[str] | None = None,
+) -> list[Check]:
+    """Run the checks on every route (or the named ones), save recordings, return checks."""
     smoke = Smoke(RecordingTransport(transport), api_key)
-    sources: dict[str, tuple[RunResult[Triage], Route]] = {}
-    for name, route in ROUTES.items():
-        result = smoke.run_route(name, route)
+    selected = [sr for sr in ROUTES if routes is None or sr.name in routes]
+    sources: dict[str, tuple[SmokeRoute, RunResult[Triage], Route]] = {}
+    for sr in selected:
+        result = smoke.run_route(sr)
         if not result.ok:
             continue
-        source = smoke.reasoning_source(name, route, result)
+        source = smoke.reasoning_source(sr, result)
         if source is None:
-            smoke.record(name, "edited_history", "FINDING", "skipped: no turn with reasoning")
+            smoke.record(sr.name, "edited_history", "FINDING", "skipped: no turn with reasoning")
             continue
-        sources[name] = source
-        smoke.edited_history(name, source[1], source[0])
-    if "r1-anthropic" in sources:
-        smoke.cross_route(*sources["r1-anthropic"])
+        sources[sr.name] = (sr, *source)
+        smoke.edited_history(sr, source[1], source[0])
+    start = next((sources[n] for n in CROSS_SOURCES if n in sources), None)
+    if start is not None:
+        smoke.cross_route(*start)
     else:
-        smoke.record("cross", "cross_route", "FINDING", "skipped: no R1 run with reasoning")
+        smoke.record("cross", "cross_route", "FINDING", "skipped: no Anthropic run with reasoning")
     save_recordings(smoke.transport.exchanges, smoke.checks, out, api_key)
     return smoke.checks
 
@@ -371,17 +403,26 @@ def dig(value: JsonValue, *path: str | int) -> JsonValue:
     return value
 
 
-def _usage_check(exchanges: Sequence[Exchange]) -> tuple[Outcome, str]:
+_USAGE_FIELDS: dict[Wire, tuple[tuple[str, ...], ...]] = {
+    "chat_completions": (("cost",), ("prompt_tokens_details", "cached_tokens")),
+    "messages": (("cost",), ("cache_read_input_tokens",)),
+}
+
+
+def _usage_check(exchanges: Sequence[Exchange], wire: Wire) -> tuple[Outcome, str]:
     ok = [e for e in exchanges if e.status == 200]
-    missing: list[str] = []
-    for field_path in (("cost",), ("prompt_tokens_details", "cached_tokens")):
-        if any(dig(e.response, "usage", *field_path) is None for e in ok):
-            missing.append(".".join(field_path))
     if not ok:
         return "INFO", "no successful responses"
+    fields = _USAGE_FIELDS[wire]
+    missing = [
+        ".".join(path)
+        for path in fields
+        if any(dig(e.response, "usage", *path) is None for e in ok)
+    ]
     if missing:
         return "FINDING", f"missing in some responses: {', '.join(missing)}"
-    return "PASS", f"cost and cached_tokens in all {len(ok)} responses"
+    names = " and ".join(path[-1] for path in fields)
+    return "PASS", f"{names} in all {len(ok)} responses"
 
 
 @dataclass(frozen=True)
@@ -401,29 +442,44 @@ def _prefix_after_first_tool_turn(conversation: Sequence[Message]) -> Prefix | N
     return None
 
 
+_THINKING_BLOCKS = ("thinking", "redacted_thinking")
+
+
+def _reasoning_items(raw: dict[str, JsonValue]) -> list[JsonValue]:
+    """The reasoning parts of an assistant message, in either wire format."""
+    details = raw.get("reasoning_details")  # Chat Completions
+    if isinstance(details, list):
+        return details
+    content = raw.get("content")  # Messages: thinking content blocks
+    if isinstance(content, list):
+        return [b for b in content if isinstance(b, dict) and b.get("type") in _THINKING_BLOCKS]
+    return []
+
+
 def _has_reasoning(turn: ModelTurn) -> bool:
-    details = turn.raw_message.get("reasoning_details")
-    return isinstance(details, list) and len(details) > 0
+    return len(_reasoning_items(turn.raw_message)) > 0
 
 
 def _tamper(raw: dict[str, JsonValue]) -> tuple[dict[str, JsonValue], str] | None:
-    """A copy of the message with its reasoning edited, and what was edited."""
+    """A copy of the message with its reasoning edited, and what was edited.
+
+    Prefers the readable text (`text` on Chat Completions, `thinking` on Messages);
+    falls back to the signature, or to redacted_thinking's `data`.
+    """
     edited = copy.deepcopy(raw)
-    details = edited.get("reasoning_details")
-    if not isinstance(details, list):
-        return None
-    for item in details:
-        if isinstance(item, dict):
-            text = item.get("text")
+    items = [i for i in _reasoning_items(edited) if isinstance(i, dict)]
+    for item in items:
+        for key in ("text", "thinking"):
+            text = item.get(key)
             if isinstance(text, str) and text:
-                item["text"] = text + " (edited)"
+                item[key] = text + " (edited)"
                 return edited, "reasoning text changed"
-    for item in details:
-        if isinstance(item, dict):
-            signature = item.get("signature")
-            if isinstance(signature, str) and signature:
-                item["signature"] = signature[:-4] + "AAAA"
-                return edited, "reasoning signature changed"
+    for item in items:
+        for key in ("signature", "data"):
+            value = item.get(key)
+            if isinstance(value, str) and len(value) > 4:
+                item[key] = value[:-4] + "AAAA"
+                return edited, f"reasoning {key} changed"
     return None
 
 
