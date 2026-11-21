@@ -5,7 +5,7 @@ Run by the maintainer, in their own terminal, with OPENROUTER_API_KEY set:
     uv run python scripts/smoke_openrouter.py --live
 
 Without --live it only explains what it would do: no request, no key needed.
-About 25 requests on Claude Sonnet 5.5, under ten cents in total.
+About 16 requests on Claude Sonnet 5.5, under ten cents in total.
 
 Four routes: R1 (Anthropic) and R2 (Amazon Bedrock with ZDR), each over both wire
 formats: Chat Completions (`r1`, `r2`) and the Messages endpoint (`r1m`, `r2m`).
@@ -16,7 +16,8 @@ For each it checks:
   usage           cost and cache-token counts are present
   reasoning       how many replies carried reasoning (thinking) blocks
   finish_reasons  finish_reason / native_finish_reason pairs (recorded)
-  probe           only if the run had no reasoning: the PROBE_TASK at effort high
+  probe           Anthropic routes only, if the run had no reasoning: a task that needs
+                  planning (PROBE_TASK) at effort max
   edited_history  a turn sent back with edited reasoning: rejected, or silently accepted?
 And once:
   cross_route     a conversation started on Anthropic, continued on Bedrock over the
@@ -65,7 +66,11 @@ from toy_agent import EXPECTED, PROBE_TASK, SYSTEM, TASK, Triage, toy_tools
 
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "tests" / "recordings" / "openrouter"
 LIMITS = Limits(max_turns=6, max_total_tokens=30_000)
-PROBE_ATTEMPTS = 2
+# At effort max the model may think at length: more room, and a longer timeout.
+PROBE_EFFORT = "max"
+PROBE_LIMITS = Limits(max_turns=8, max_total_tokens=60_000, max_tokens_per_request=8_000)
+PROBE_TIMEOUT_S = 180.0
+PROBE_ROUTES = ("r1-anthropic", "r1m-anthropic")
 
 _JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
@@ -143,10 +148,10 @@ class Smoke:
     api_key: SecretStr
     checks: list[Check] = field(default_factory=lambda: [])
 
-    def client(self, route: Route, wire: Wire) -> OpenRouterBackend:
+    def client(self, route: Route, wire: Wire, timeout_s: float = 60.0) -> OpenRouterBackend:
         http = httpx.Client(transport=self.transport)
         backend = OpenRouterClient if wire == "chat_completions" else OpenRouterMessagesClient
-        return backend(api_key=self.api_key, route=route, http=http)
+        return backend(api_key=self.api_key, route=route, http=http, timeout_s=timeout_s)
 
     def record(self, route: str, name: str, outcome: Outcome, detail: str) -> None:
         self.checks.append(Check(route, name, outcome, detail))
@@ -216,29 +221,39 @@ class Smoke:
     ) -> tuple[RunResult[Triage], Route] | None:
         """A finished run with a reasoning turn, and the route that produced it.
 
-        Sonnet 5.5 thinks adaptively, so the main run may have none. Then run PROBE_TASK
-        at effort high, up to PROBE_ATTEMPTS times.
+        Sonnet 5.5 thinks adaptively and skipped thinking on the toy task, even at
+        effort high. On the Anthropic routes, try once with PROBE_TASK at effort max.
         """
         if _prefix_after_first_tool_turn(result.conversation) is not None:
             return result, sr.route
-        probe_route = sr.route.model_copy(update={"effort": "high"})
-        for attempt in range(1, PROBE_ATTEMPTS + 1):
-            self.transport.label = f"{sr.name}/probe"
-            probe = run_agent(
-                model=self.client(probe_route, sr.wire),
-                tools=toy_tools(),
-                system=SYSTEM,
-                task=PROBE_TASK,
-                answer_model=Triage,
-                limits=LIMITS,
-            )
-            if probe.ok and _prefix_after_first_tool_turn(probe.conversation) is not None:
-                self.record(sr.name, "probe", "INFO", f"reasoning on attempt {attempt}")
-                return probe, probe_route
-        self.record(
-            sr.name, "probe", "FINDING", f"no reasoning in {PROBE_ATTEMPTS} attempts at effort high"
+        if sr.name not in PROBE_ROUTES:
+            self.record(sr.name, "probe", "INFO", "skipped: the probe runs on Anthropic routes")
+            return None
+        probe_route = sr.route.model_copy(update={"effort": PROBE_EFFORT})
+        self.transport.label = f"{sr.name}/probe"
+        probe = run_agent(
+            model=self.client(probe_route, sr.wire, PROBE_TIMEOUT_S),
+            tools=toy_tools(),
+            system=SYSTEM,
+            task=PROBE_TASK,
+            answer_model=Triage,
+            limits=PROBE_LIMITS,
         )
-        return None
+        replies = [m for m in probe.conversation if isinstance(m, ModelTurn)]
+        thinking = sum(_has_reasoning(r) for r in replies)
+        detail = (
+            f"{probe.turns} turns, {thinking} of {len(replies)} replies with reasoning, "
+            f"{probe.usage.reasoning_tokens} reasoning tokens, "
+            f"answer {'correct' if probe.answer == EXPECTED else repr(probe.answer)}"
+        )
+        if not probe.ok:
+            self.record(sr.name, "probe", "FINDING", f"{probe.stop_reason}: {probe.error}")
+            return None
+        if _prefix_after_first_tool_turn(probe.conversation) is None:
+            self.record(sr.name, "probe", "FINDING", f"no reasoning at effort max: {detail}")
+            return None
+        self.record(sr.name, "probe", "INFO", detail)
+        return probe, probe_route
 
     def edited_history(self, sr: SmokeRoute, route: Route, result: RunResult[Triage]) -> None:
         prefix = _prefix_after_first_tool_turn(result.conversation)
@@ -259,10 +274,10 @@ class Smoke:
         ]
         self.transport.label = f"{sr.name}/edited_history"
         try:
-            self.client(route, sr.wire).complete(
+            self.client(route, sr.wire, PROBE_TIMEOUT_S).complete(
                 messages,
                 offered_tools(toy_tools(), Triage),
-                max_tokens=LIMITS.max_tokens_per_request,
+                max_tokens=PROBE_LIMITS.max_tokens_per_request,
             )
         except ModelError as exc:
             self.record(sr.name, "edited_history", "PASS", f"rejected loudly ({what}): {exc}")
@@ -278,10 +293,10 @@ class Smoke:
         target = ROUTE_BEDROCK_ZDR.model_copy(update={"effort": route.effort})
         self.transport.label = "cross/cross_route"
         try:
-            self.client(target, sr.wire).complete(
+            self.client(target, sr.wire, PROBE_TIMEOUT_S).complete(
                 [*prefix.before, prefix.turn, *prefix.results],
                 offered_tools(toy_tools(), Triage),
-                max_tokens=LIMITS.max_tokens_per_request,
+                max_tokens=PROBE_LIMITS.max_tokens_per_request,
             )
         except ModelError as exc:
             self.record("cross", "cross_route", "PASS", f"from {sr.name}, failed loudly: {exc}")

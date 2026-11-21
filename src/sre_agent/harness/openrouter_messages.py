@@ -47,9 +47,14 @@ class _MStopDetails(WireModel):
     explanation: str | None = None
 
 
+class _MOutputDetails(WireModel):
+    thinking_tokens: int | None = None
+
+
 class _MUsage(WireModel):
     input_tokens: int
     output_tokens: int
+    output_tokens_details: _MOutputDetails | None = None  # reports thinking tokens
     cache_creation_input_tokens: int | None = None
     cache_read_input_tokens: int | None = None
     cost: float | None = None
@@ -209,5 +214,6 @@ def _usage(wire: _MUsage) -> Usage:
         completion_tokens=wire.output_tokens,
         cached_tokens=cache_read,
         cache_write_tokens=cache_write,
+        reasoning_tokens=(wire.output_tokens_details or _MOutputDetails()).thinking_tokens or 0,
         cost=wire.cost,
     )

@@ -60,6 +60,7 @@ def _response(
         "usage": {
             "input_tokens": 100,
             "output_tokens": 40,
+            "output_tokens_details": {"thinking_tokens": 12},
             "cache_creation_input_tokens": 20,
             "cache_read_input_tokens": 30,
             "cost": 0.0007,
@@ -174,6 +175,7 @@ def test_response_is_parsed() -> None:
     assert reply.usage.cached_tokens == 30
     assert reply.usage.cache_write_tokens == 20
     assert reply.usage.cost == pytest.approx(0.0007)
+    assert reply.usage.reasoning_tokens == 12  # Anthropic's own thinking-token count
 
 
 @pytest.mark.parametrize(

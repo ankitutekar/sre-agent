@@ -13,15 +13,32 @@ SYSTEM = (
     "When you know the answer, call final_answer."
 )
 TASK = "What is the current status of payments-api, and which team owns it?"
-# A variant that invites reasoning, for the smoke test's edited-history check: Sonnet 5.5
-# thinks adaptively and often skips thinking on TASK. Same expected answer.
+# A task that needs reasoning before the first tool call, for the smoke test's
+# edited-history and cross-route checks. Sonnet 5.5 thinks adaptively and did not think
+# at all on TASK, or on a two-service variant, even at effort high (2026-11-20).
+# Same expected answer: payments-api is the degraded service whose dependency is healthy.
 PROBE_TASK = (
-    "Two services may be affected: payments-api and orders-api. Check both, work out "
-    "which one needs attention and why, then report that service and its owning team."
+    "Users report checkout errors. Dependency map: checkout-web calls orders-api and "
+    "payments-api; payments-api calls ledger-db; orders-api calls inventory-db. A "
+    "degraded service is the root cause only if every service it calls is healthy. "
+    "Plan which services to check and in what order before calling any tool, use as few "
+    "tool calls as you can, then report the root-cause service, its status and its owner."
 )
 
-_STATUS = {"payments-api": "degraded", "orders-api": "healthy"}
-_OWNERS = {"payments-api": "team-payments", "orders-api": "team-orders"}
+_STATUS = {
+    "checkout-web": "degraded",
+    "orders-api": "healthy",
+    "payments-api": "degraded",
+    "ledger-db": "healthy",
+    "inventory-db": "healthy",
+}
+_OWNERS = {
+    "checkout-web": "team-web",
+    "orders-api": "team-orders",
+    "payments-api": "team-payments",
+    "ledger-db": "team-ledger",
+    "inventory-db": "team-inventory",
+}
 
 
 class ServiceArgs(ToolArgs):

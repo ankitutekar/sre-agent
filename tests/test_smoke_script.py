@@ -233,13 +233,14 @@ def test_probe_runs_when_the_main_run_has_no_reasoning(tmp_path: Path) -> None:
     assert outcomes["r1-anthropic edited_history"] == "PASS"
     assert outcomes["cross cross_route"] == "PASS"
     probe = json.loads((tmp_path / "r1-anthropic" / "probe-01.json").read_text(encoding="utf-8"))
-    assert probe["request"]["reasoning"] == {"effort": "high", "enabled": True}
+    assert probe["request"]["reasoning"] == {"effort": "max", "enabled": True}
+    assert probe["request"]["max_tokens"] == 8_000
 
 
 def test_no_reasoning_after_probing_is_a_finding(tmp_path: Path) -> None:
     script = [
         *("plain", "final"),  # R1 run
-        *("plain", "final", "plain", "final"),  # two probes, still no reasoning
+        *("plain", "final"),  # the probe, still no reasoning
         *("tools", "final", "reject"),  # R2
     ]
     checks = smoke.run_smoke(
@@ -343,3 +344,19 @@ def test_signed_but_empty_thinking_is_tampered_by_signature() -> None:
     assert what == "reasoning signature changed"
     assert edited != raw
     assert raw["content"] == [{"type": "thinking", "thinking": "", "signature": "c2lnbmF0dXJl"}]
+
+
+def test_the_probe_runs_on_anthropic_routes_only(tmp_path: Path) -> None:
+    script = [
+        *("tools", "final", "reject"),  # r1: reasoning, edited history
+        *("plain", "final"),  # r2: no reasoning, and no probe on Bedrock
+        "reject",  # cross route
+    ]
+    checks = smoke.run_smoke(
+        transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=CHAT
+    )
+    assert not script
+    outcomes = _outcomes(checks)
+    assert outcomes["r2-bedrock-zdr probe"] == "INFO"
+    assert outcomes["r2-bedrock-zdr edited_history"] == "FINDING"
+    assert outcomes["cross cross_route"] == "PASS"
