@@ -5,7 +5,13 @@ history. Claude 5.5 rejects edited history, and an audit trail is only useful if
 nobody rewrites it (ADR 0008).
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, JsonValue
+
+# The wire format a model reply came in. History from one format cannot be replayed
+# through the other: that would be a silent edit of the conversation.
+type Wire = Literal["chat_completions", "messages"]
 
 
 class _Record(BaseModel):
@@ -88,8 +94,9 @@ class ModelTurn(_Record):
     """One reply from the model, in two forms.
 
     The typed fields are what the loop reasons over. `raw_message` is the assistant
-    message exactly as the provider sent it (including reasoning details); the
-    backend sends it back unchanged on later turns. Nothing may modify it.
+    message exactly as the provider sent it (including reasoning or thinking
+    blocks); the backend that produced it (`wire`) sends it back unchanged on
+    later turns. Nothing may modify it.
     """
 
     text: str | None
@@ -100,6 +107,7 @@ class ModelTurn(_Record):
     usage: Usage
     model: str
     provider: str | None
+    wire: Wire
     raw_message: dict[str, JsonValue]
 
 

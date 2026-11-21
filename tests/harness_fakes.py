@@ -53,6 +53,7 @@ def turn(
         usage=Usage(prompt_tokens=tokens // 2, completion_tokens=tokens - tokens // 2, cost=0.01),
         model="test/model",
         provider="Test",
+        wire="chat_completions",
         raw_message=raw,
     )
 

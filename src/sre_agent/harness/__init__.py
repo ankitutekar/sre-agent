@@ -20,6 +20,7 @@ from sre_agent.harness.messages import (
     ToolSpec,
     Usage,
     UserMessage,
+    Wire,
 )
 from sre_agent.harness.model_client import (
     MissingAPIKeyError,
@@ -33,9 +34,12 @@ from sre_agent.harness.openrouter import (
     API_KEY_ENV,
     ROUTE_ANTHROPIC,
     ROUTE_BEDROCK_ZDR,
+    SONNET_5_5,
+    OpenRouterBackend,
     OpenRouterClient,
     Route,
 )
+from sre_agent.harness.openrouter_messages import OpenRouterMessagesClient
 from sre_agent.harness.tools import LocalToolClient, Tool, ToolArgs, ToolClient, ToolError
 from sre_agent.harness.trace import (
     ModelCallEvent,
@@ -50,6 +54,7 @@ __all__ = [
     "FINAL_ANSWER_TOOL",
     "ROUTE_ANTHROPIC",
     "ROUTE_BEDROCK_ZDR",
+    "SONNET_5_5",
     "Limits",
     "LocalToolClient",
     "Message",
@@ -61,7 +66,9 @@ __all__ = [
     "ModelResponseError",
     "ModelTurn",
     "NoOpTrace",
+    "OpenRouterBackend",
     "OpenRouterClient",
+    "OpenRouterMessagesClient",
     "PinViolationError",
     "RecordingTrace",
     "Route",
@@ -79,6 +86,7 @@ __all__ = [
     "TraceHook",
     "Usage",
     "UserMessage",
+    "Wire",
     "offered_tools",
     "run_agent",
 ]
