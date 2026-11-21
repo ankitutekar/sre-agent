@@ -352,7 +352,7 @@ def test_signed_but_empty_thinking_is_tampered_by_signature() -> None:
         "role": "assistant",
         "content": [{"type": "thinking", "thinking": "", "signature": "c2lnbmF0dXJl"}],
     }
-    tampered = smoke._tamper(raw)  # pyright: ignore[reportPrivateUsage]
+    tampered = smoke.tamper(raw)
     assert tampered is not None
     edited, what = tampered
     assert what == "reasoning signature changed"

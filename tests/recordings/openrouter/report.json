@@ -1,0 +1,224 @@
+[
+  {
+    "route": "r1-anthropic",
+    "name": "run",
+    "outcome": "PASS",
+    "detail": "2 turns, tools ['get_owner', 'get_service_status']"
+  },
+  {
+    "route": "r1-anthropic",
+    "name": "pin",
+    "outcome": "PASS",
+    "detail": "anthropic/claude-sonnet-5.5 via Anthropic"
+  },
+  {
+    "route": "r1-anthropic",
+    "name": "strict_args",
+    "outcome": "PASS",
+    "detail": "all tool arguments valid"
+  },
+  {
+    "route": "r1-anthropic",
+    "name": "usage",
+    "outcome": "PASS",
+    "detail": "cost and cached_tokens in all 2 responses"
+  },
+  {
+    "route": "r1-anthropic",
+    "name": "reasoning",
+    "outcome": "INFO",
+    "detail": "0 of 2 replies"
+  },
+  {
+    "route": "r1-anthropic",
+    "name": "finish_reasons",
+    "outcome": "INFO",
+    "detail": "tool_calls/tool_use, tool_calls/tool_use"
+  },
+  {
+    "route": "r1-anthropic",
+    "name": "cost",
+    "outcome": "INFO",
+    "detail": "1833 tokens (0 reasoning), $0.00526"
+  },
+  {
+    "route": "r1-anthropic",
+    "name": "probe",
+    "outcome": "INFO",
+    "detail": "1 turns, 1 of 1 replies with reasoning, 2000 reasoning tokens, answer None, stopped: length"
+  },
+  {
+    "route": "r1-anthropic",
+    "name": "edited_history",
+    "outcome": "FINDING",
+    "detail": "accepted silently (reasoning text changed)"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "run",
+    "outcome": "PASS",
+    "detail": "2 turns, tools ['get_owner', 'get_service_status']"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "pin",
+    "outcome": "PASS",
+    "detail": "anthropic/claude-sonnet-5.5 via Amazon Bedrock"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "strict_args",
+    "outcome": "PASS",
+    "detail": "all tool arguments valid"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "usage",
+    "outcome": "PASS",
+    "detail": "cost and cached_tokens in all 2 responses"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "reasoning",
+    "outcome": "INFO",
+    "detail": "0 of 2 replies"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "finish_reasons",
+    "outcome": "INFO",
+    "detail": "tool_calls/tool_use, tool_calls/tool_use"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "cost",
+    "outcome": "INFO",
+    "detail": "1833 tokens (0 reasoning), $0.00526"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "probe",
+    "outcome": "INFO",
+    "detail": "skipped: the probe runs on Anthropic routes"
+  },
+  {
+    "route": "r2-bedrock-zdr",
+    "name": "edited_history",
+    "outcome": "FINDING",
+    "detail": "skipped: no turn with reasoning"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "run",
+    "outcome": "PASS",
+    "detail": "2 turns, tools ['get_owner', 'get_service_status']"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "pin",
+    "outcome": "PASS",
+    "detail": "anthropic/claude-sonnet-5.5 via Anthropic"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "strict_args",
+    "outcome": "PASS",
+    "detail": "all tool arguments valid"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "usage",
+    "outcome": "PASS",
+    "detail": "cost and cache_read_input_tokens in all 2 responses"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "reasoning",
+    "outcome": "INFO",
+    "detail": "0 of 2 replies"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "finish_reasons",
+    "outcome": "INFO",
+    "detail": "tool_calls/tool_use, tool_calls/tool_use"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "cost",
+    "outcome": "INFO",
+    "detail": "1833 tokens (0 reasoning), $0.00526"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "probe",
+    "outcome": "INFO",
+    "detail": "1 turns, 1 of 1 replies with reasoning, 2000 reasoning tokens, answer None, stopped: length"
+  },
+  {
+    "route": "r1m-anthropic",
+    "name": "edited_history",
+    "outcome": "FINDING",
+    "detail": "accepted silently (reasoning text changed)"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "run",
+    "outcome": "PASS",
+    "detail": "2 turns, tools ['get_owner', 'get_service_status']"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "pin",
+    "outcome": "PASS",
+    "detail": "anthropic/claude-sonnet-5.5 via Amazon Bedrock"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "strict_args",
+    "outcome": "PASS",
+    "detail": "all tool arguments valid"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "usage",
+    "outcome": "PASS",
+    "detail": "cost and cache_read_input_tokens in all 2 responses"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "reasoning",
+    "outcome": "INFO",
+    "detail": "0 of 2 replies"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "finish_reasons",
+    "outcome": "INFO",
+    "detail": "tool_calls/tool_use, tool_calls/tool_use"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "cost",
+    "outcome": "INFO",
+    "detail": "1833 tokens (0 reasoning), $0.00526"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "probe",
+    "outcome": "INFO",
+    "detail": "skipped: the probe runs on Anthropic routes"
+  },
+  {
+    "route": "r2m-bedrock-zdr",
+    "name": "edited_history",
+    "outcome": "FINDING",
+    "detail": "skipped: no turn with reasoning"
+  },
+  {
+    "route": "cross",
+    "name": "cross_route",
+    "outcome": "PASS",
+    "detail": "from r1m-anthropic, failed loudly: HTTP 400: Your request contains encrypted reasoning or compaction content that can only be processed by the provider that created it (anthropic) or by azure/global, claude-on-aws, azure/us, but your request's provider.only preference excludes all of them. Allow one of them or start a new conversation without "
+  }
+]

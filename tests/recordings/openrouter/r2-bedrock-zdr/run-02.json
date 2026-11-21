@@ -1,0 +1,203 @@
+{
+  "label": "r2-bedrock-zdr/run",
+  "request": {
+    "model": "anthropic/claude-sonnet-5.5",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a triage assistant. Use the tools to look things up; do not guess. When you know the answer, call final_answer."
+      },
+      {
+        "role": "user",
+        "content": "What is the current status of payments-api, and which team owns it?"
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "reasoning": null,
+        "tool_calls": [
+          {
+            "type": "function",
+            "index": 0,
+            "id": "toolu_bdrk_01AmdRCtTywfUzggbv7p8Nuw",
+            "function": {
+              "name": "get_service_status",
+              "arguments": "{\"service\": \"payments-api\"}"
+            }
+          },
+          {
+            "type": "function",
+            "index": 1,
+            "id": "toolu_bdrk_01McVS6wDgNQjzhebTJeTfzJ",
+            "function": {
+              "name": "get_owner",
+              "arguments": "{\"service\": \"payments-api\"}"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "toolu_bdrk_01AmdRCtTywfUzggbv7p8Nuw",
+        "content": "degraded"
+      },
+      {
+        "role": "tool",
+        "tool_call_id": "toolu_bdrk_01McVS6wDgNQjzhebTJeTfzJ",
+        "content": "team-payments"
+      }
+    ],
+    "max_tokens": 4000,
+    "reasoning": {
+      "effort": "medium",
+      "enabled": true
+    },
+    "provider": {
+      "only": [
+        "amazon-bedrock"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true,
+      "data_collection": "deny",
+      "zdr": true
+    },
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_service_status",
+          "description": "Current health of a service: healthy, degraded or down.",
+          "parameters": {
+            "additionalProperties": false,
+            "properties": {
+              "service": {
+                "title": "Service",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service"
+            ],
+            "title": "ServiceArgs",
+            "type": "object"
+          },
+          "strict": true
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "get_owner",
+          "description": "The team that owns a service.",
+          "parameters": {
+            "additionalProperties": false,
+            "properties": {
+              "service": {
+                "title": "Service",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service"
+            ],
+            "title": "ServiceArgs",
+            "type": "object"
+          },
+          "strict": true
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "final_answer",
+          "description": "Submit your final answer. Call this once, on its own, when you are done. The run ends when a valid answer is accepted.",
+          "parameters": {
+            "description": "The toy agent's final answer.",
+            "properties": {
+              "service": {
+                "title": "Service",
+                "type": "string"
+              },
+              "status": {
+                "title": "Status",
+                "type": "string"
+              },
+              "owner": {
+                "title": "Owner",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service",
+              "status",
+              "owner"
+            ],
+            "title": "Triage",
+            "type": "object"
+          },
+          "strict": true
+        }
+      }
+    ],
+    "tool_choice": "auto"
+  },
+  "status": 200,
+  "response": {
+    "id": "gen-1795249316-1VcEE0Csc3mD2Eq4wuEt",
+    "object": "chat.completion",
+    "created": 1795249316,
+    "model": "anthropic/claude-sonnet-5.5",
+    "provider": "Amazon Bedrock",
+    "system_fingerprint": null,
+    "service_tier": "default",
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": null,
+        "finish_reason": "tool_calls",
+        "native_finish_reason": "tool_use",
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "refusal": null,
+          "reasoning": null,
+          "tool_calls": [
+            {
+              "type": "function",
+              "index": 0,
+              "id": "toolu_bdrk_013Ne3AtqsMC8VRZnykQVs1Q",
+              "function": {
+                "name": "final_answer",
+                "arguments": "{\"service\": \"payments-api\", \"status\": \"degraded\", \"owner\": \"team-payments\"}"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 900,
+      "completion_tokens": 99,
+      "total_tokens": 999,
+      "cost": 0.00279,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.00279,
+        "upstream_inference_prompt_cost": 0.0018,
+        "upstream_inference_completions_cost": 0.00099
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    }
+  }
+}

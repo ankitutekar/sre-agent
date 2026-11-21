@@ -1,0 +1,183 @@
+{
+  "label": "r1-anthropic/control",
+  "request": {
+    "model": "anthropic/claude-sonnet-5.5",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a triage assistant. Use the tools to look things up; do not guess. When you know the answer, call final_answer."
+      },
+      {
+        "role": "user",
+        "content": "Users report checkout errors. Dependency map: checkout-web calls orders-api and payments-api; payments-api calls ledger-db; orders-api calls inventory-db. A degraded service is the root cause only if every service it calls is healthy. Plan which services to check and in what order before calling any tool, use as few tool calls as you can, then report the root-cause service, its status and its owner."
+      },
+      {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "reasoning": "I'm mapping out the dependencies: checkout-web calls orders-api and payments-api, payments-api uses ledger-db, and orders-api uses inventory-db. The likely root cause is a service that's degraded while everything it calls looks healthy, and I'm weighing how to check statuses with as few tool calls as possible, starting from the leaf services.\n\nI'm weighing which services could be the root cause: the leaf services without dependencies are suspects if degraded, while a mid-level service only counts if its own dependencies check out healthy. Since the status checks are independent, I could batch them all in one parallel block, but I want to keep the number of tool calls low, so I'm deciding whether checking every service is actually necessary.\n\nI'm weighing a trade-off between checking all five services in one parallel batch, which means one block but five calls, and a smaller set of checks that could still pinpoint the root cause. Whichever I pick, the root cause is a degraded service whose own dependencies all look healthy, so I'll need the statuses before I can say which one it is.\n\nI'm weighing whether I can skip checking checkout-web up front, since its status only matters if all four downstream services come back healthy. Checking the four dependencies in parallel keeps things to one block, and I'd only need an extra call for checkout-web in that specific case, even though that could mean one more round.\n\nI'm comparing two ways to cut the tool calls: checking only the four downstream services first, which takes 5 calls in the common case but 6 if everything looks healthy, versus checking all five up front for 6 calls in total.\n\nI'm comparing a sequential approach that starts with checkout-web, which saves calls if it turns out healthy but gets complicated if downstream services are the real problem. I'm also considering checking just the two leaf databases first, though a degraded leaf might not be the only root cause.\n\nI'm still sorting out whether a mid-level service could be a second, independent root cause alongside a degraded leaf, which would mean two checks aren't enough to rule out other branches. I'm also looking at how the owner lookup depends on first identifying the root cause.\n\nI'm still weighing whether to check all services in parallel for a fixed number of calls, or to short-circuit sequentially, since the root cause only counts if its own dependencies are healthy. Either way the status checks are independent, so I'd batch them in one block.\n\n",
+        "reasoning_details": [
+          {
+            "type": "reasoning.text",
+            "text": "I'm mapping out the dependencies: checkout-web calls orders-api and payments-api, payments-api uses ledger-db, and orders-api uses inventory-db. The likely root cause is a service that's degraded while everything it calls looks healthy, and I'm weighing how to check statuses with as few tool calls as possible, starting from the leaf services.\n\nI'm weighing which services could be the root cause: the leaf services without dependencies are suspects if degraded, while a mid-level service only counts if its own dependencies check out healthy. Since the status checks are independent, I could batch them all in one parallel block, but I want to keep the number of tool calls low, so I'm deciding whether checking every service is actually necessary.\n\nI'm weighing a trade-off between checking all five services in one parallel batch, which means one block but five calls, and a smaller set of checks that could still pinpoint the root cause. Whichever I pick, the root cause is a degraded service whose own dependencies all look healthy, so I'll need the statuses before I can say which one it is.\n\nI'm weighing whether I can skip checking checkout-web up front, since its status only matters if all four downstream services come back healthy. Checking the four dependencies in parallel keeps things to one block, and I'd only need an extra call for checkout-web in that specific case, even though that could mean one more round.\n\nI'm comparing two ways to cut the tool calls: checking only the four downstream services first, which takes 5 calls in the common case but 6 if everything looks healthy, versus checking all five up front for 6 calls in total.\n\nI'm comparing a sequential approach that starts with checkout-web, which saves calls if it turns out healthy but gets complicated if downstream services are the real problem. I'm also considering checking just the two leaf databases first, though a degraded leaf might not be the only root cause.\n\nI'm still sorting out whether a mid-level service could be a second, independent root cause alongside a degraded leaf, which would mean two checks aren't enough to rule out other branches. I'm also looking at how the owner lookup depends on first identifying the root cause.\n\nI'm still weighing whether to check all services in parallel for a fixed number of calls, or to short-circuit sequentially, since the root cause only counts if its own dependencies are healthy. Either way the status checks are independent, so I'd batch them in one block.\n\n",
+            "format": "anthropic-claude-v1",
+            "index": 0,
+            "signature": "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.eyJlbmRwb2ludF9zbHVnIjoiYW50aHJvcGljL2NsYXVkZS1zb25uZXQtNS41LTIwMjYwOTI4fGFudGhyb3BpYyJ9"
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": "Continue."
+      }
+    ],
+    "max_tokens": 1024,
+    "reasoning": {
+      "effort": "max",
+      "enabled": true
+    },
+    "provider": {
+      "only": [
+        "anthropic"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true,
+      "data_collection": "deny"
+    },
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_service_status",
+          "description": "Current health of a service: healthy, degraded or down.",
+          "parameters": {
+            "additionalProperties": false,
+            "properties": {
+              "service": {
+                "title": "Service",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service"
+            ],
+            "title": "ServiceArgs",
+            "type": "object"
+          },
+          "strict": true
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "get_owner",
+          "description": "The team that owns a service.",
+          "parameters": {
+            "additionalProperties": false,
+            "properties": {
+              "service": {
+                "title": "Service",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service"
+            ],
+            "title": "ServiceArgs",
+            "type": "object"
+          },
+          "strict": true
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "final_answer",
+          "description": "Submit your final answer. Call this once, on its own, when you are done. The run ends when a valid answer is accepted.",
+          "parameters": {
+            "description": "The toy agent's final answer.",
+            "properties": {
+              "service": {
+                "title": "Service",
+                "type": "string"
+              },
+              "status": {
+                "title": "Status",
+                "type": "string"
+              },
+              "owner": {
+                "title": "Owner",
+                "type": "string"
+              }
+            },
+            "required": [
+              "service",
+              "status",
+              "owner"
+            ],
+            "title": "Triage",
+            "type": "object"
+          },
+          "strict": true
+        }
+      }
+    ],
+    "tool_choice": "auto"
+  },
+  "status": 200,
+  "response": {
+    "id": "gen-1795249294-Uj100aufpzGsj5mM9cNt",
+    "object": "chat.completion",
+    "created": 1795249294,
+    "model": "anthropic/claude-sonnet-5.5",
+    "provider": "Anthropic",
+    "system_fingerprint": null,
+    "service_tier": "default",
+    "choices": [
+      {
+        "index": 0,
+        "logprobs": null,
+        "finish_reason": "length",
+        "native_finish_reason": "max_tokens",
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "refusal": null,
+          "reasoning": "I'm settling on a plan that uses as few tool calls as possible, since the service is degraded while all its dependencies look healthy and the root cause is still unclear.\n\nI'm weighing whether to check the four downstream services in one parallel batch, since a degraded leaf or a degraded mid-level service with a healthy dependency would already point to the root cause, and only look at checkout-web if all four come back healthy.\n\nI'm now thinking through the cases: if a leaf or a mid-level service turns out degraded, the root cause is clear from the first batch, and checkout-web only needs checking if all four downstream services come back healthy. I'm also questioning the edge case where a service is \"down\" rather than \"degraded,\" and noting that a degraded checkout-web would only be ambiguous if its callees looked healthy but a leaf didn't, which I'll resolve once the data is in.\n\nI'm weighing the edge case where the minimal call count depends on the order of checks: checking the two leaves first could resolve the root cause in fewer calls, but a degraded service only counts as the root cause if all its callees are healthy, and that condition has to hold even when several services are degraded at once.\n\n",
+          "reasoning_details": [
+            {
+              "type": "reasoning.text",
+              "text": "I'm settling on a plan that uses as few tool calls as possible, since the service is degraded while all its dependencies look healthy and the root cause is still unclear.\n\nI'm weighing whether to check the four downstream services in one parallel batch, since a degraded leaf or a degraded mid-level service with a healthy dependency would already point to the root cause, and only look at checkout-web if all four come back healthy.\n\nI'm now thinking through the cases: if a leaf or a mid-level service turns out degraded, the root cause is clear from the first batch, and checkout-web only needs checking if all four downstream services come back healthy. I'm also questioning the edge case where a service is \"down\" rather than \"degraded,\" and noting that a degraded checkout-web would only be ambiguous if its callees looked healthy but a leaf didn't, which I'll resolve once the data is in.\n\nI'm weighing the edge case where the minimal call count depends on the order of checks: checking the two leaves first could resolve the root cause in fewer calls, but a degraded service only counts as the root cause if all its callees are healthy, and that condition has to hold even when several services are degraded at once.\n\n",
+              "format": "anthropic-claude-v1",
+              "index": 0,
+              "signature": "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.eyJlbmRwb2ludF9zbHVnIjoiYW50aHJvcGljL2NsYXVkZS1zb25uZXQtNS41LTIwMjYwOTI4fGFudGhyb3BpYyJ9"
+            }
+          ]
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 2850,
+      "completion_tokens": 1024,
+      "total_tokens": 3874,
+      "cost": 0.01594,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.01594,
+        "upstream_inference_prompt_cost": 0.0057,
+        "upstream_inference_completions_cost": 0.01024
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 1024,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    }
+  }
+}

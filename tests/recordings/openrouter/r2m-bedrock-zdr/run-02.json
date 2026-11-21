@@ -1,0 +1,198 @@
+{
+  "label": "r2m-bedrock-zdr/run",
+  "request": {
+    "model": "anthropic/claude-sonnet-5.5",
+    "max_tokens": 4000,
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the current status of payments-api, and which team owns it?"
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_bdrk_01MTjcyiocNdSuNe8jawQ3zf",
+            "caller": {
+              "type": "direct"
+            },
+            "name": "get_service_status",
+            "input": {
+              "service": "payments-api"
+            }
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_bdrk_01M5B6dTm9cCdzfSENudTutX",
+            "caller": {
+              "type": "direct"
+            },
+            "name": "get_owner",
+            "input": {
+              "service": "payments-api"
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_bdrk_01MTjcyiocNdSuNe8jawQ3zf",
+            "content": "degraded",
+            "is_error": false
+          },
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_bdrk_01M5B6dTm9cCdzfSENudTutX",
+            "content": "team-payments",
+            "is_error": false
+          }
+        ]
+      }
+    ],
+    "output_config": {
+      "effort": "medium"
+    },
+    "provider": {
+      "only": [
+        "amazon-bedrock"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true,
+      "data_collection": "deny",
+      "zdr": true
+    },
+    "system": "You are a triage assistant. Use the tools to look things up; do not guess. When you know the answer, call final_answer.",
+    "thinking": {
+      "type": "adaptive",
+      "display": "summarized"
+    },
+    "tools": [
+      {
+        "name": "get_service_status",
+        "description": "Current health of a service: healthy, degraded or down.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "service": {
+              "title": "Service",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service"
+          ],
+          "title": "ServiceArgs",
+          "type": "object"
+        },
+        "strict": true
+      },
+      {
+        "name": "get_owner",
+        "description": "The team that owns a service.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "service": {
+              "title": "Service",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service"
+          ],
+          "title": "ServiceArgs",
+          "type": "object"
+        },
+        "strict": true
+      },
+      {
+        "name": "final_answer",
+        "description": "Submit your final answer. Call this once, on its own, when you are done. The run ends when a valid answer is accepted.",
+        "input_schema": {
+          "description": "The toy agent's final answer.",
+          "properties": {
+            "service": {
+              "title": "Service",
+              "type": "string"
+            },
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "owner": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "status",
+            "owner"
+          ],
+          "title": "Triage",
+          "type": "object"
+        },
+        "strict": true
+      }
+    ],
+    "tool_choice": {
+      "type": "auto"
+    }
+  },
+  "status": 200,
+  "response": {
+    "id": "msg_bdrk_6eeepcu56bzozjx25ytocnye4hgg2kovzrkug6xbx2nb2y65xf2a",
+    "type": "message",
+    "role": "assistant",
+    "container": null,
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_bdrk_01RDXx7cLN6aBsGEzJ8BDscA",
+        "caller": {
+          "type": "direct"
+        },
+        "name": "final_answer",
+        "input": {
+          "service": "payments-api",
+          "status": "degraded",
+          "owner": "team-payments"
+        }
+      }
+    ],
+    "model": "anthropic/claude-sonnet-5.5",
+    "stop_reason": "tool_use",
+    "stop_details": null,
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 900,
+      "output_tokens": 99,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "inference_geo": null,
+      "server_tool_use": null,
+      "service_tier": "standard",
+      "speed": "standard",
+      "cost": 0.00279,
+      "is_byok": false,
+      "cost_details": {
+        "upstream_inference_cost": 0.00279,
+        "upstream_inference_prompt_cost": 0.0018,
+        "upstream_inference_completions_cost": 0.00099
+      }
+    },
+    "context_management": null,
+    "provider": "Amazon Bedrock"
+  }
+}

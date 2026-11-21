@@ -230,7 +230,7 @@ class Smoke:
         Sonnet 5.5 thinks adaptively and skipped thinking on the toy task, even at
         effort high. On the Anthropic routes, try once with PROBE_TASK at effort max.
         """
-        if _reasoning_prefix(result.conversation) is not None:
+        if reasoning_prefix(result.conversation) is not None:
             return result, sr.route
         if sr.name not in PROBE_ROUTES:
             self.record(sr.name, "probe", "INFO", "skipped: the probe runs on Anthropic routes")
@@ -252,7 +252,7 @@ class Smoke:
             f"{probe.usage.reasoning_tokens} reasoning tokens, "
             f"answer {'correct' if probe.answer == EXPECTED else repr(probe.answer)}"
         )
-        if _reasoning_prefix(probe.conversation) is None:
+        if reasoning_prefix(probe.conversation) is None:
             stopped = "" if probe.ok else f" (stopped: {probe.stop_reason})"
             self.record(
                 sr.name, "probe", "FINDING", f"no reasoning at effort max{stopped}: {detail}"
@@ -263,11 +263,11 @@ class Smoke:
         return probe, probe_route
 
     def edited_history(self, sr: SmokeRoute, route: Route, result: RunResult[Triage]) -> None:
-        prefix = _reasoning_prefix(result.conversation)
+        prefix = reasoning_prefix(result.conversation)
         if prefix is None:
             self.record(sr.name, "edited_history", "FINDING", "skipped: no turn with reasoning")
             return
-        tampered = _tamper(prefix.turn.raw_message)
+        tampered = tamper(prefix.turn.raw_message)
         if tampered is None:
             self.record(
                 sr.name, "edited_history", "FINDING", "skipped: reasoning has nothing to edit"
@@ -301,7 +301,7 @@ class Smoke:
         self.record(sr.name, "edited_history", "FINDING", f"accepted silently ({what})")
 
     def cross_route(self, sr: SmokeRoute, result: RunResult[Triage], route: Route) -> None:
-        prefix = _reasoning_prefix(result.conversation)
+        prefix = reasoning_prefix(result.conversation)
         if prefix is None:
             self.record("cross", "cross_route", "FINDING", "skipped: no reasoning turn")
             return
@@ -470,7 +470,7 @@ class Prefix:
     after: tuple[Message, ...]
 
 
-def _reasoning_prefix(conversation: Sequence[Message]) -> Prefix | None:
+def reasoning_prefix(conversation: Sequence[Message]) -> Prefix | None:
     for i, message in enumerate(conversation):
         if isinstance(message, ModelTurn) and _has_reasoning(message):
             if message.tool_calls:
@@ -485,7 +485,7 @@ def _reasoning_prefix(conversation: Sequence[Message]) -> Prefix | None:
 _THINKING_BLOCKS = ("thinking", "redacted_thinking")
 
 
-def _reasoning_items(raw: dict[str, JsonValue]) -> list[JsonValue]:
+def reasoning_items(raw: dict[str, JsonValue]) -> list[JsonValue]:
     """The reasoning parts of an assistant message, in either wire format."""
     details = raw.get("reasoning_details")  # Chat Completions
     if isinstance(details, list):
@@ -497,17 +497,17 @@ def _reasoning_items(raw: dict[str, JsonValue]) -> list[JsonValue]:
 
 
 def _has_reasoning(turn: ModelTurn) -> bool:
-    return len(_reasoning_items(turn.raw_message)) > 0
+    return len(reasoning_items(turn.raw_message)) > 0
 
 
-def _tamper(raw: dict[str, JsonValue]) -> tuple[dict[str, JsonValue], str] | None:
+def tamper(raw: dict[str, JsonValue]) -> tuple[dict[str, JsonValue], str] | None:
     """A copy of the message with its reasoning edited, and what was edited.
 
     Prefers the readable text (`text` on Chat Completions, `thinking` on Messages);
     falls back to the signature, or to redacted_thinking's `data`.
     """
     edited = copy.deepcopy(raw)
-    items = [i for i in _reasoning_items(edited) if isinstance(i, dict)]
+    items = [i for i in reasoning_items(edited) if isinstance(i, dict)]
     for item in items:
         for key in ("text", "thinking"):
             text = item.get(key)
