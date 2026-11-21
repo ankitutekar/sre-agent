@@ -1,0 +1,162 @@
+{
+  "label": "r1m-anthropic/run",
+  "request": {
+    "model": "anthropic/claude-sonnet-5.5",
+    "max_tokens": 4000,
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the current status of payments-api, and which team owns it?"
+      }
+    ],
+    "output_config": {
+      "effort": "medium"
+    },
+    "provider": {
+      "only": [
+        "anthropic"
+      ],
+      "allow_fallbacks": false,
+      "require_parameters": true,
+      "data_collection": "deny"
+    },
+    "system": "You are a triage assistant. Use the tools to look things up; do not guess. When you know the answer, call final_answer.",
+    "thinking": {
+      "type": "adaptive",
+      "display": "summarized"
+    },
+    "tools": [
+      {
+        "name": "get_service_status",
+        "description": "Current health of a service: healthy, degraded or down.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "service": {
+              "title": "Service",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service"
+          ],
+          "title": "ServiceArgs",
+          "type": "object"
+        },
+        "strict": true
+      },
+      {
+        "name": "get_owner",
+        "description": "The team that owns a service.",
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "service": {
+              "title": "Service",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service"
+          ],
+          "title": "ServiceArgs",
+          "type": "object"
+        },
+        "strict": true
+      },
+      {
+        "name": "final_answer",
+        "description": "Submit your final answer. Call this once, on its own, when you are done. The run ends when a valid answer is accepted.",
+        "input_schema": {
+          "description": "The toy agent's final answer.",
+          "properties": {
+            "service": {
+              "title": "Service",
+              "type": "string"
+            },
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "owner": {
+              "title": "Owner",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service",
+            "status",
+            "owner"
+          ],
+          "title": "Triage",
+          "type": "object"
+        },
+        "strict": true
+      }
+    ],
+    "tool_choice": {
+      "type": "auto"
+    }
+  },
+  "status": 200,
+  "response": {
+    "id": "msg_011ChFkQx7ezDBU8n8SGLEUC",
+    "type": "message",
+    "role": "assistant",
+    "container": null,
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_013ZBsDLu2ghHWP6jHVkLQGB",
+        "caller": {
+          "type": "direct"
+        },
+        "name": "get_service_status",
+        "input": {
+          "service": "payments-api"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01NfdTi7xBAEK1dzYYHEbaSD",
+        "caller": {
+          "type": "direct"
+        },
+        "name": "get_owner",
+        "input": {
+          "service": "payments-api"
+        }
+      }
+    ],
+    "model": "anthropic/claude-sonnet-5.5",
+    "stop_reason": "tool_use",
+    "stop_details": null,
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 734,
+      "output_tokens": 100,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "server_tool_use": null,
+      "service_tier": "standard",
+      "speed": "standard",
+      "cost": 0.002468,
+      "is_byok": false,
+      "cost_details": {
+        "upstream_inference_cost": 0.002468,
+        "upstream_inference_prompt_cost": 0.001468,
+        "upstream_inference_completions_cost": 0.001
+      }
+    },
+    "context_management": null,
+    "provider": "Anthropic"
+  }
+}
