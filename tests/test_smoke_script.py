@@ -86,6 +86,7 @@ def _messages_response(kind: str, served: str) -> dict[str, JsonValue]:
         "tools": [M_THINKING, *M_TOOLS],
         "plain": M_TOOLS,
         "final": M_FINAL,
+        "cut": [M_THINKING],  # thinking cut off by max_tokens, no tool call
     }
     content = contents[kind]
     return {
@@ -94,7 +95,7 @@ def _messages_response(kind: str, served: str) -> dict[str, JsonValue]:
         "model": ROUTE_ANTHROPIC.model,
         "provider": served,
         "content": content,
-        "stop_reason": "tool_use",
+        "stop_reason": "max_tokens" if kind == "cut" else "tool_use",
         "usage": {
             "input_tokens": 500,
             "output_tokens": 50,
@@ -105,7 +106,8 @@ def _messages_response(kind: str, served: str) -> dict[str, JsonValue]:
 
 
 def _fake_openrouter(script: list[str]) -> httpx.MockTransport:
-    """Answers requests in order: 'tools', 'plain' (no reasoning), 'final', 'reject' (400)
+    """Answers requests in order: 'tools', 'plain' (no reasoning), 'cut' (thinking hit
+    max_tokens), 'final', 'reject' (400)
     or 'no_provider' (404), in the wire format of the endpoint that was called."""
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -120,7 +122,14 @@ def _fake_openrouter(script: list[str]) -> httpx.MockTransport:
             return httpx.Response(404, json={"error": {"message": "No endpoints found"}})
         if request.url.path.endswith("/messages"):
             return httpx.Response(200, json=_messages_response(kind, SERVED[only]))
-        if kind == "plain":  # a tool turn without reasoning (adaptive thinking skipped it)
+        finish, native = ("length", "max_tokens") if kind == "cut" else ("tool_calls", "tool_use")
+        if kind == "cut":  # thinking cut off by max_tokens, no tool call
+            message = {
+                "role": "assistant",
+                "content": "",
+                "reasoning_details": TOOLS_TURN["reasoning_details"],
+            }
+        elif kind == "plain":  # a tool turn without reasoning (adaptive thinking skipped it)
             message = {k: v for k, v in TOOLS_TURN.items() if k != "reasoning_details"}
         else:
             message = TOOLS_TURN if kind == "tools" else FINAL_TURN
@@ -131,8 +140,8 @@ def _fake_openrouter(script: list[str]) -> httpx.MockTransport:
                 "provider": SERVED[only],
                 "choices": [
                     {
-                        "finish_reason": "tool_calls",
-                        "native_finish_reason": "tool_use",
+                        "finish_reason": finish,
+                        "native_finish_reason": native,
                         "message": message,
                     }
                 ],
@@ -148,6 +157,11 @@ def _fake_openrouter(script: list[str]) -> httpx.MockTransport:
     return httpx.MockTransport(handler)
 
 
+# A route whose run has reasoning: two turns, then the control (accepted) and the
+# edited copy (rejected).
+CONTROLLED = ("tools", "final", "final", "reject")
+
+
 def _outcomes(checks: list[smoke.Check]) -> dict[str, str]:
     return {f"{c.route} {c.name}": c.outcome for c in checks}
 
@@ -158,7 +172,7 @@ def test_dry_run_sends_nothing(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_all_checks_pass_when_routes_behave(tmp_path: Path) -> None:
-    script = ["tools", "final", "reject", "tools", "final", "reject", "reject"]
+    script = [*CONTROLLED, *CONTROLLED, "reject"]
     checks = smoke.run_smoke(
         transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=CHAT
     )
@@ -172,7 +186,7 @@ def test_all_checks_pass_when_routes_behave(tmp_path: Path) -> None:
 
 def test_silent_acceptance_is_a_finding(tmp_path: Path) -> None:
     # The edited-history request comes back 200 instead of 400.
-    script = ["tools", "final", "final", "tools", "final", "reject", "final"]
+    script = ["tools", "final", "final", "final", *CONTROLLED, "final"]
     checks = smoke.run_smoke(
         transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=CHAT
     )
@@ -182,7 +196,7 @@ def test_silent_acceptance_is_a_finding(tmp_path: Path) -> None:
 
 
 def test_no_eligible_provider_on_r2_is_a_finding_not_a_failure(tmp_path: Path) -> None:
-    script = ["tools", "final", "reject", "no_provider", "reject"]
+    script = [*CONTROLLED, "no_provider", "reject"]
     checks = smoke.run_smoke(
         transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=CHAT
     )
@@ -192,7 +206,7 @@ def test_no_eligible_provider_on_r2_is_a_finding_not_a_failure(tmp_path: Path) -
 
 
 def test_recordings_are_saved_without_the_key(tmp_path: Path) -> None:
-    script = ["tools", "final", "reject", "tools", "final", "reject", "reject"]
+    script = [*CONTROLLED, *CONTROLLED, "reject"]
     smoke.run_smoke(
         transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=CHAT
     )
@@ -219,8 +233,8 @@ def test_a_recording_containing_the_key_is_refused(tmp_path: Path) -> None:
 
 def test_probe_runs_when_the_main_run_has_no_reasoning(tmp_path: Path) -> None:
     script = [
-        *("plain", "final", "tools", "final", "reject"),  # R1: run, probe, edited history
-        *("tools", "final", "reject"),  # R2: run has reasoning, so no probe
+        *("plain", "final", "tools", "final", "final", "reject"),  # R1: run, probe, control, edit
+        *CONTROLLED,  # R2: run has reasoning, so no probe
         "reject",  # cross route
     ]
     checks = smoke.run_smoke(
@@ -234,14 +248,14 @@ def test_probe_runs_when_the_main_run_has_no_reasoning(tmp_path: Path) -> None:
     assert outcomes["cross cross_route"] == "PASS"
     probe = json.loads((tmp_path / "r1-anthropic" / "probe-01.json").read_text(encoding="utf-8"))
     assert probe["request"]["reasoning"] == {"effort": "max", "enabled": True}
-    assert probe["request"]["max_tokens"] == 8_000
+    assert probe["request"]["max_tokens"] == 2_000
 
 
 def test_no_reasoning_after_probing_is_a_finding(tmp_path: Path) -> None:
     script = [
         *("plain", "final"),  # R1 run
         *("plain", "final"),  # the probe, still no reasoning
-        *("tools", "final", "reject"),  # R2
+        *CONTROLLED,  # R2
     ]
     checks = smoke.run_smoke(
         transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=CHAT
@@ -255,7 +269,7 @@ def test_no_reasoning_after_probing_is_a_finding(tmp_path: Path) -> None:
 
 def test_default_route_without_a_provider_is_a_failure(tmp_path: Path) -> None:
     # What the first live run showed: an account-level ZDR setting removed Anthropic.
-    script = ["no_provider", "tools", "final", "reject"]
+    script = ["no_provider", *CONTROLLED]
     checks = smoke.run_smoke(
         transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=CHAT
     )
@@ -286,8 +300,8 @@ def test_account_identifiers_are_scrubbed(tmp_path: Path) -> None:
 
 def test_messages_routes_check_thinking_and_cross_route(tmp_path: Path) -> None:
     script = [
-        *("tools", "final", "reject"),  # r1m: run with thinking, edited history rejected
-        *("tools", "final", "reject"),  # r2m
+        *CONTROLLED,  # r1m: run with thinking, control accepted, edited history rejected
+        *CONTROLLED,  # r2m
         "reject",  # cross route, from r1m to Bedrock over the Messages endpoint
     ]
     checks = smoke.run_smoke(
@@ -319,8 +333,8 @@ def test_messages_routes_check_thinking_and_cross_route(tmp_path: Path) -> None:
 
 def test_cross_route_prefers_the_messages_conversation(tmp_path: Path) -> None:
     script = [
-        *("tools", "final", "reject"),  # r1 (chat), with reasoning
-        *("tools", "final", "reject"),  # r1m (messages), with thinking
+        *CONTROLLED,  # r1 (chat), with reasoning
+        *CONTROLLED,  # r1m (messages), with thinking
         "reject",  # cross
     ]
     checks = smoke.run_smoke(
@@ -348,7 +362,7 @@ def test_signed_but_empty_thinking_is_tampered_by_signature() -> None:
 
 def test_the_probe_runs_on_anthropic_routes_only(tmp_path: Path) -> None:
     script = [
-        *("tools", "final", "reject"),  # r1: reasoning, edited history
+        *CONTROLLED,  # r1: reasoning, control, edited history
         *("plain", "final"),  # r2: no reasoning, and no probe on Bedrock
         "reject",  # cross route
     ]
@@ -360,3 +374,42 @@ def test_the_probe_runs_on_anthropic_routes_only(tmp_path: Path) -> None:
     assert outcomes["r2-bedrock-zdr probe"] == "INFO"
     assert outcomes["r2-bedrock-zdr edited_history"] == "FINDING"
     assert outcomes["cross cross_route"] == "PASS"
+
+
+def test_a_rejected_control_makes_edited_history_inconclusive(tmp_path: Path) -> None:
+    script = ["tools", "final", "reject", *CONTROLLED, "reject"]
+    checks = smoke.run_smoke(
+        transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=CHAT
+    )
+    assert not script
+    detail = {f"{c.route} {c.name}": c for c in checks}["r1-anthropic edited_history"]
+    assert detail.outcome == "FINDING"
+    assert detail.detail.startswith("inconclusive: control rejected")
+
+
+@pytest.mark.parametrize("routes", [("r1-anthropic", "r2-bedrock-zdr"), MESSAGES_ROUTES])
+def test_thinking_cut_off_by_max_tokens_is_used_with_continue(
+    tmp_path: Path, routes: tuple[str, str]
+) -> None:
+    # What the fifth live run showed: at effort max the model spent the whole cap thinking.
+    script = [
+        *("plain", "final", "cut"),  # R1: run without reasoning, probe stops on length
+        *("final", "reject"),  # control accepted, edited copy rejected
+        *CONTROLLED,  # R2
+        "reject",  # cross route
+    ]
+    checks = smoke.run_smoke(
+        transport=_fake_openrouter(script), api_key=SecretStr(FAKE_KEY), out=tmp_path, routes=routes
+    )
+    assert not script
+    outcomes = _outcomes(checks)
+    r1 = routes[0]
+    assert outcomes[f"{r1} probe"] == "INFO"
+    assert outcomes[f"{r1} edited_history"] == "PASS"
+    assert outcomes["cross cross_route"] == "PASS"
+    control = json.loads((tmp_path / r1 / "control-01.json").read_text(encoding="utf-8"))
+    last = control["request"]["messages"][-1]
+    assert last == {"role": "user", "content": "Continue."}
+    assert control["request"]["max_tokens"] == 1_024
+    probe = json.loads((tmp_path / r1 / "probe-01.json").read_text(encoding="utf-8"))
+    assert probe["request"]["max_tokens"] == 2_000

@@ -5,7 +5,7 @@ Run by the maintainer, in their own terminal, with OPENROUTER_API_KEY set:
     uv run python scripts/smoke_openrouter.py --live
 
 Without --live it only explains what it would do: no request, no key needed.
-About 16 requests on Claude Sonnet 5.5, under ten cents in total.
+About 20 requests on Claude Sonnet 5.5, about ten cents in total.
 
 Four routes: R1 (Anthropic) and R2 (Amazon Bedrock with ZDR), each over both wire
 formats: Chat Completions (`r1`, `r2`) and the Messages endpoint (`r1m`, `r2m`).
@@ -18,7 +18,8 @@ For each it checks:
   finish_reasons  finish_reason / native_finish_reason pairs (recorded)
   probe           Anthropic routes only, if the run had no reasoning: a task that needs
                   planning (PROBE_TASK) at effort max
-  edited_history  a turn sent back with edited reasoning: rejected, or silently accepted?
+  edited_history  first a control: the unedited history must be accepted; then a copy
+                  with edited reasoning: rejected, or silently accepted?
 And once:
   cross_route     a conversation started on Anthropic, continued on Bedrock over the
                   same wire format: must fail loudly (the Messages one if it has reasoning)
@@ -58,6 +59,7 @@ from sre_agent.harness import (
     Route,
     RunResult,
     ToolResult,
+    UserMessage,
     Wire,
     offered_tools,
     run_agent,
@@ -68,7 +70,11 @@ DEFAULT_OUT = Path(__file__).resolve().parents[1] / "tests" / "recordings" / "op
 LIMITS = Limits(max_turns=6, max_total_tokens=30_000)
 # At effort max the model may think at length: more room, and a longer timeout.
 PROBE_EFFORT = "max"
-PROBE_LIMITS = Limits(max_turns=8, max_total_tokens=60_000, max_tokens_per_request=8_000)
+# At effort max the model spent all of an 8k cap thinking on turn 1 (2026-11-21), and the
+# cut-off thinking was still signed. A 2k cap gets a signed block for a fraction of the cost.
+PROBE_LIMITS = Limits(max_turns=8, max_total_tokens=30_000, max_tokens_per_request=2_000)
+REPLAY_MAX_TOKENS = 1_024  # edited-history, control and cross-route requests: status only
+CONTINUE = UserMessage(text="Continue.")  # follows a thinking turn cut off before any tool call
 PROBE_TIMEOUT_S = 180.0
 PROBE_ROUTES = ("r1-anthropic", "r1m-anthropic")
 
@@ -224,7 +230,7 @@ class Smoke:
         Sonnet 5.5 thinks adaptively and skipped thinking on the toy task, even at
         effort high. On the Anthropic routes, try once with PROBE_TASK at effort max.
         """
-        if _prefix_after_first_tool_turn(result.conversation) is not None:
+        if _reasoning_prefix(result.conversation) is not None:
             return result, sr.route
         if sr.name not in PROBE_ROUTES:
             self.record(sr.name, "probe", "INFO", "skipped: the probe runs on Anthropic routes")
@@ -246,17 +252,18 @@ class Smoke:
             f"{probe.usage.reasoning_tokens} reasoning tokens, "
             f"answer {'correct' if probe.answer == EXPECTED else repr(probe.answer)}"
         )
-        if not probe.ok:
-            self.record(sr.name, "probe", "FINDING", f"{probe.stop_reason}: {probe.error}")
+        if _reasoning_prefix(probe.conversation) is None:
+            stopped = "" if probe.ok else f" (stopped: {probe.stop_reason})"
+            self.record(
+                sr.name, "probe", "FINDING", f"no reasoning at effort max{stopped}: {detail}"
+            )
             return None
-        if _prefix_after_first_tool_turn(probe.conversation) is None:
-            self.record(sr.name, "probe", "FINDING", f"no reasoning at effort max: {detail}")
-            return None
-        self.record(sr.name, "probe", "INFO", detail)
+        # A length stop is expected here: the model may spend the whole cap thinking.
+        self.record(sr.name, "probe", "INFO", f"{detail}, stopped: {probe.stop_reason}")
         return probe, probe_route
 
     def edited_history(self, sr: SmokeRoute, route: Route, result: RunResult[Triage]) -> None:
-        prefix = _prefix_after_first_tool_turn(result.conversation)
+        prefix = _reasoning_prefix(result.conversation)
         if prefix is None:
             self.record(sr.name, "edited_history", "FINDING", "skipped: no turn with reasoning")
             return
@@ -266,18 +273,27 @@ class Smoke:
                 sr.name, "edited_history", "FINDING", "skipped: reasoning has nothing to edit"
             )
             return
+        # Control: the same history, unedited, must be accepted. Otherwise a rejection of
+        # the edited copy could have another cause (e.g. this shape cannot be replayed).
+        self.transport.label = f"{sr.name}/control"
+        try:
+            self._replay(route, sr.wire, [*prefix.before, prefix.turn, *prefix.after])
+        except ModelError as exc:
+            self.record(
+                sr.name, "edited_history", "FINDING", f"inconclusive: control rejected: {exc}"
+            )
+            return
         edited, what = tampered
-        messages: list[Message] = [
-            *prefix.before,
-            prefix.turn.model_copy(update={"raw_message": edited}),
-            *prefix.results,
-        ]
         self.transport.label = f"{sr.name}/edited_history"
         try:
-            self.client(route, sr.wire, PROBE_TIMEOUT_S).complete(
-                messages,
-                offered_tools(toy_tools(), Triage),
-                max_tokens=PROBE_LIMITS.max_tokens_per_request,
+            self._replay(
+                route,
+                sr.wire,
+                [
+                    *prefix.before,
+                    prefix.turn.model_copy(update={"raw_message": edited}),
+                    *prefix.after,
+                ],
             )
         except ModelError as exc:
             self.record(sr.name, "edited_history", "PASS", f"rejected loudly ({what}): {exc}")
@@ -285,24 +301,27 @@ class Smoke:
         self.record(sr.name, "edited_history", "FINDING", f"accepted silently ({what})")
 
     def cross_route(self, sr: SmokeRoute, result: RunResult[Triage], route: Route) -> None:
-        prefix = _prefix_after_first_tool_turn(result.conversation)
+        prefix = _reasoning_prefix(result.conversation)
         if prefix is None:
             self.record("cross", "cross_route", "FINDING", "skipped: no reasoning turn")
             return
         # Same wire and effort as the source conversation: only the provider differs.
+        # The source route's control request showed this history is accepted there.
         target = ROUTE_BEDROCK_ZDR.model_copy(update={"effort": route.effort})
         self.transport.label = "cross/cross_route"
         try:
-            self.client(target, sr.wire, PROBE_TIMEOUT_S).complete(
-                [*prefix.before, prefix.turn, *prefix.results],
-                offered_tools(toy_tools(), Triage),
-                max_tokens=PROBE_LIMITS.max_tokens_per_request,
-            )
+            self._replay(target, sr.wire, [*prefix.before, prefix.turn, *prefix.after])
         except ModelError as exc:
             self.record("cross", "cross_route", "PASS", f"from {sr.name}, failed loudly: {exc}")
             return
         self.record(
             "cross", "cross_route", "FINDING", f"Bedrock accepted {sr.name}'s reasoning silently"
+        )
+
+    def _replay(self, route: Route, wire: Wire, messages: Sequence[Message]) -> None:
+        """One request; raises ModelError if refused. Only acceptance matters."""
+        self.client(route, wire, PROBE_TIMEOUT_S).complete(
+            messages, offered_tools(toy_tools(), Triage), max_tokens=REPLAY_MAX_TOKENS
         )
 
 
@@ -442,18 +461,24 @@ def _usage_check(exchanges: Sequence[Exchange], wire: Wire) -> tuple[Outcome, st
 
 @dataclass(frozen=True)
 class Prefix:
-    """A conversation cut just after the first tool-calling turn that carries reasoning."""
+    """A conversation cut just after the first turn that carries reasoning."""
 
     before: tuple[Message, ...]
     turn: ModelTurn
-    results: tuple[Message, ...]  # the turn's tool results
+    # What followed: the turn's tool results, or "Continue." if it made no tool call
+    # (a thinking turn cut off by max_tokens).
+    after: tuple[Message, ...]
 
 
-def _prefix_after_first_tool_turn(conversation: Sequence[Message]) -> Prefix | None:
+def _reasoning_prefix(conversation: Sequence[Message]) -> Prefix | None:
     for i, message in enumerate(conversation):
-        if isinstance(message, ModelTurn) and message.tool_calls and _has_reasoning(message):
-            end = i + 1 + len(message.tool_calls)
-            return Prefix(tuple(conversation[:i]), message, tuple(conversation[i + 1 : end]))
+        if isinstance(message, ModelTurn) and _has_reasoning(message):
+            if message.tool_calls:
+                end = i + 1 + len(message.tool_calls)
+                after = tuple(conversation[i + 1 : end])
+            else:
+                after = (CONTINUE,)
+            return Prefix(tuple(conversation[:i]), message, after)
     return None
 
 
